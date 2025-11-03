@@ -14,6 +14,7 @@
 # Go workspace
 go.work
 go.work.sum
+!cmd/mkdown
 
 # IDE
 .vscode/
