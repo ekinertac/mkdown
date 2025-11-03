@@ -1,5 +1,5 @@
 # Binaries
-mkdown
+/mkdown
 *.exe
 *.dll
 *.so
