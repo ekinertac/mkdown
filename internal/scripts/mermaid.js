@@ -13,17 +13,47 @@
       const pre = block.parentElement;
       const code = block.textContent;
       
-      // Create new div for mermaid
+      // Create wrapper for diagram and fullscreen button
+      const wrapper = document.createElement('div');
+      wrapper.className = 'mermaid-wrapper';
+      
+      // Create mermaid div
       const div = document.createElement('div');
       div.className = 'mermaid';
       div.textContent = code;
       
-      // Replace pre with div
-      pre.replaceWith(div);
+      // Create fullscreen button
+      const fsBtn = document.createElement('button');
+      fsBtn.className = 'mermaid-fullscreen-btn';
+      fsBtn.innerHTML = '⛶';
+      fsBtn.title = 'Toggle fullscreen';
+      fsBtn.setAttribute('aria-label', 'Toggle fullscreen');
+      
+      wrapper.appendChild(div);
+      wrapper.appendChild(fsBtn);
+      
+      // Replace pre with wrapper
+      pre.replaceWith(wrapper);
+      
+      // Add fullscreen toggle
+      fsBtn.addEventListener('click', () => {
+        wrapper.classList.toggle('fullscreen');
+        fsBtn.innerHTML = wrapper.classList.contains('fullscreen') ? '✕' : '⛶';
+      });
     });
     
     // Render all mermaid diagrams
     mermaid.run();
+    
+    // Close fullscreen with Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.mermaid-wrapper.fullscreen').forEach(w => {
+          w.classList.remove('fullscreen');
+          w.querySelector('.mermaid-fullscreen-btn').innerHTML = '⛶';
+        });
+      }
+    });
   });
 </script>
 

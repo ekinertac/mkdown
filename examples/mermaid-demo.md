@@ -80,6 +80,17 @@ pie title Languages in Example Codebase
 
 ---
 
+## Fullscreen Mode
+
+Each diagram has a fullscreen button (⛶) in the top-right corner. Click it to:
+- Expand diagram to full screen
+- View large diagrams without scrolling
+- Close with Escape key or click the ✕ button
+
+Perfect for complex flowcharts, large sequence diagrams, or detailed class diagrams!
+
+---
+
 **Note**: Mermaid diagrams require internet connection to load the Mermaid.js library from CDN.
 
 To generate this file:

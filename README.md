@@ -112,7 +112,12 @@ See `examples/extensions.md` for usage examples.
 ### Phase 2 (Complete ✅)
 
 - **Mermaid Diagrams**: Flowcharts, sequence diagrams, gantt charts (use `--mermaid` flag)
+  - Fullscreen mode with ⛶ button
+  - Theme-aware rendering
+  - Escape key to exit fullscreen
 - **Math Rendering**: LaTeX-style equations with KaTeX (use `--math` flag)
+  - Inline and block math support
+  - Full LaTeX syntax
 
 See `examples/mermaid-demo.md` and `examples/math-demo.md` for examples.
 

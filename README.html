@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.6;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  color: #e6edf3;
+  background-color: #0d1117;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #f0f6fc;
+}
+
+h1 {
+  font-size: 2em;
+  border-bottom: 1px solid #21262d;
+  padding-bottom: 0.3em;
+}
+h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid #21262d;
+  padding-bottom: 0.3em;
+}
+h3 {
+  font-size: 1.25em;
+}
+h4 {
+  font-size: 1em;
+}
+h5 {
+  font-size: 0.875em;
+}
+h6 {
+  font-size: 0.85em;
+  color: #7d8590;
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+a {
+  color: #58a6ff;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  background-color: rgba(110, 118, 129, 0.4);
+  border-radius: 3px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  color: #e6edf3;
+}
+
+pre {
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: #161b22;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+}
+
+pre code {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  line-height: inherit;
+  background-color: transparent;
+  border: 0;
+}
+
+blockquote {
+  margin: 0;
+  padding: 0 1em;
+  color: #7d8590;
+  border-left: 0.25em solid #3b434b;
+}
+
+table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  margin-top: 0;
+  margin-bottom: 16px;
+  width: 100%;
+  overflow: auto;
+}
+
+table th {
+  font-weight: 600;
+  padding: 6px 13px;
+  border: 1px solid #3b434b;
+  background-color: #161b22;
+}
+
+table td {
+  padding: 6px 13px;
+  border: 1px solid #3b434b;
+}
+
+table tr {
+  background-color: #0d1117;
+  border-top: 1px solid #21262d;
+}
+
+table tr:nth-child(2n) {
+  background-color: #161b22;
+}
+
+ul,
+ol {
+  padding-left: 2em;
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+li + li {
+  margin-top: 0.25em;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+hr {
+  height: 0.25em;
+  padding: 0;
+  margin: 24px 0;
+  background-color: #21262d;
+  border: 0;
+}
+
+/* Task lists */
+input[type='checkbox'] {
+  margin-right: 0.5em;
+}
+
+/* Definition lists */
+dl {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+dt {
+  font-weight: 600;
+  margin-top: 1em;
+  color: #f0f6fc;
+}
+
+dd {
+  margin-left: 2em;
+  margin-bottom: 0.5em;
+  color: #e6edf3;
+}
+
+/* Footnotes */
+.footnotes {
+  margin-top: 3em;
+  padding-top: 1em;
+  border-top: 1px solid #3b434b;
+  font-size: 0.9em;
+  color: #8b949e;
+}
+
+.footnotes ol {
+  padding-left: 1.5em;
+}
+
+.footnotes li {
+  margin-bottom: 0.5em;
+}
+
+.footnotes p {
+  margin: 0.25em 0;
+}
+
+.footnote-ref,
+.footnote-backref {
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.footnote-ref::before {
+  content: '[';
+}
+
+.footnote-ref::after {
+  content: ']';
+}
+
+sup {
+  line-height: 0;
+}
+
+/* Mermaid diagrams */
+.mermaid-wrapper {
+  position: relative;
+  margin: 2em 0;
+  padding: 1em;
+  background-color: #161b22;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+}
+
+.mermaid {
+  text-align: center;
+}
+
+.mermaid-fullscreen-btn {
+  position: absolute;
+  top: 0.5em;
+  right: 0.5em;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: #8b949e;
+  cursor: pointer;
+  padding: 0.4em 0.6em;
+  font-size: 1.2em;
+  line-height: 1;
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+.mermaid-fullscreen-btn:hover {
+  background: #30363d;
+  color: #e6edf3;
+  border-color: #58a6ff;
+}
+
+.mermaid-wrapper.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  margin: 0;
+  padding: 2em;
+  background-color: #0d1117;
+  border: none;
+  border-radius: 0;
+  z-index: 9999;
+  overflow: auto;
+}
+
+.mermaid-wrapper.fullscreen .mermaid {
+  max-width: 95%;
+  margin: 0 auto;
+}
+
+.mermaid-wrapper.fullscreen .mermaid-fullscreen-btn {
+  top: 1em;
+  right: 1em;
+  font-size: 1.5em;
+  padding: 0.5em 0.7em;
+}
+
+/* Math blocks */
+.math-block {
+  margin: 1.5em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+/* Syntax highlighting - Monokai theme */
+.chroma {
+  background-color: #272822;
+  color: #f8f8f2;
+  padding: 16px;
+  border-radius: 6px;
+  overflow-x: auto;
+  border: 1px solid #3b434b;
+}
+.chroma .err {
+  color: #960050;
+  background-color: #1e0010;
+}
+.chroma .lntd {
+  vertical-align: top;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.chroma .lntable {
+  border-spacing: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.chroma .hl {
+  display: block;
+  width: 100%;
+  background-color: #3c3d38;
+}
+.chroma .ln {
+  margin-right: 0.4em;
+  padding: 0 0.4em;
+  color: #7f7f7f;
+}
+.chroma .k {
+  color: #66d9ef;
+}
+.chroma .kc {
+  color: #66d9ef;
+}
+.chroma .kd {
+  color: #66d9ef;
+}
+.chroma .kn {
+  color: #f92672;
+}
+.chroma .kp {
+  color: #66d9ef;
+}
+.chroma .kr {
+  color: #66d9ef;
+}
+.chroma .kt {
+  color: #66d9ef;
+}
+.chroma .na {
+  color: #a6e22e;
+}
+.chroma .nc {
+  color: #a6e22e;
+}
+.chroma .no {
+  color: #66d9ef;
+}
+.chroma .nd {
+  color: #a6e22e;
+}
+.chroma .ne {
+  color: #a6e22e;
+}
+.chroma .nf {
+  color: #a6e22e;
+}
+.chroma .nx {
+  color: #a6e22e;
+}
+.chroma .nt {
+  color: #f92672;
+}
+.chroma .l {
+  color: #ae81ff;
+}
+.chroma .ld {
+  color: #e6db74;
+}
+.chroma .s {
+  color: #e6db74;
+}
+.chroma .sa {
+  color: #e6db74;
+}
+.chroma .s2 {
+  color: #e6db74;
+}
+.chroma .sc {
+  color: #e6db74;
+}
+.chroma .dl {
+  color: #e6db74;
+}
+.chroma .sd {
+  color: #e6db74;
+}
+.chroma .se {
+  color: #ae81ff;
+}
+.chroma .sh {
+  color: #e6db74;
+}
+.chroma .si {
+  color: #e6db74;
+}
+.chroma .sx {
+  color: #e6db74;
+}
+.chroma .sr {
+  color: #e6db74;
+}
+.chroma .s1 {
+  color: #e6db74;
+}
+.chroma .ss {
+  color: #e6db74;
+}
+.chroma .m {
+  color: #ae81ff;
+}
+.chroma .mb {
+  color: #ae81ff;
+}
+.chroma .mf {
+  color: #ae81ff;
+}
+.chroma .mh {
+  color: #ae81ff;
+}
+.chroma .mi {
+  color: #ae81ff;
+}
+.chroma .il {
+  color: #ae81ff;
+}
+.chroma .mo {
+  color: #ae81ff;
+}
+.chroma .o {
+  color: #f92672;
+}
+.chroma .ow {
+  color: #f92672;
+}
+.chroma .c {
+  color: #75715e;
+}
+.chroma .ch {
+  color: #75715e;
+}
+.chroma .cm {
+  color: #75715e;
+}
+.chroma .c1 {
+  color: #75715e;
+}
+.chroma .cs {
+  color: #75715e;
+}
+.chroma .cp {
+  color: #75715e;
+}
+.chroma .cpf {
+  color: #75715e;
+}
+.chroma .gd {
+  color: #f92672;
+}
+.chroma .ge {
+  font-style: italic;
+}
+.chroma .gi {
+  color: #a6e22e;
+}
+.chroma .gs {
+  font-weight: bold;
+}
+.chroma .gu {
+  color: #75715e;
+}
+</style>
+    
+</head>
+<body>
+    <h1 id="mkdown">mkdown</h1>
+<p>A simple, fast markdown to HTML converter with a clean default template.</p>
+<pre class="chroma"><code><span class="line"><span class="cl">mkdown input.md              <span class="c1"># Converts to input.html</span>
+</span></span><span class="line"><span class="cl">mkdown doc.md -o out.html   <span class="c1"># Custom output</span>
+</span></span></code></pre><h2 id="features">Features</h2>
+<ul>
+<li>Single binary, no dependencies</li>
+<li>GitHub Flavored Markdown support (tables, strikethrough, task lists)</li>
+<li>Syntax highlighting with Chroma</li>
+<li>Frontmatter parsing (YAML)</li>
+<li>Dark theme by default (light theme available)</li>
+<li>Separated CSS for easy theming</li>
+</ul>
+<h2 id="installation">Installation</h2>
+<pre class="chroma"><code><span class="line"><span class="cl">go install github.com/ekinertac/mkdown@latest
+</span></span></code></pre><p>Or build from source:</p>
+<pre class="chroma"><code><span class="line"><span class="cl">git clone https://github.com/ekinertac/mkdown.git
+</span></span><span class="line"><span class="cl"><span class="nb">cd</span> mkdown
+</span></span><span class="line"><span class="cl">go build
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Run tests</span>
+</span></span><span class="line"><span class="cl">make <span class="nb">test</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Or with coverage</span>
+</span></span><span class="line"><span class="cl">make test-coverage
+</span></span></code></pre><h2 id="usage">Usage</h2>
+<h3 id="basic-usage">Basic Usage</h3>
+<p>Convert a markdown file to HTML:</p>
+<pre class="chroma"><code><span class="line"><span class="cl">mkdown input.md
+</span></span></code></pre><p>This creates <code>input.html</code> in the same directory.</p>
+<h3 id="cli-flags">CLI Flags</h3>
+<pre><code>mkdown &lt;input.md&gt; [flags]
+
+Flags:
+  -o, --output &lt;path&gt;  Output file path (default: input filename with .html extension)
+  -t, --theme &lt;name&gt;   Theme to use: dark (default), light
+  --mermaid            Enable Mermaid diagram support (requires internet)
+  --math               Enable math rendering with KaTeX (requires internet)
+  -v, --version        Show version number
+  -h, --help          Show help message
+
+Examples:
+  mkdown README.md                          # Creates README.html (dark theme)
+  mkdown doc.md -o output.html             # Custom output path
+  mkdown doc.md --theme light              # Use light theme
+  mkdown diagram.md --mermaid              # Enable Mermaid diagrams
+  mkdown math.md --math                    # Enable math rendering
+  mkdown doc.md --mermaid --math --theme light  # All features
+</code></pre>
+<h3 id="configuration">Configuration</h3>
+<p>Config file support (via <code>~/.mkdown.yml</code>) is planned for future releases. This will allow:</p>
+<ul>
+<li>Custom theme selection</li>
+<li>Default output paths</li>
+<li>Extension preferences</li>
+</ul>
+<h2 id="frontmatter">Frontmatter</h2>
+<p>Add metadata to your markdown files:</p>
+<pre class="chroma"><code><span class="line"><span class="cl">---
+</span></span><span class="line"><span class="cl">title: My Document
+</span></span><span class="line"><span class="cl">author: John Doe
+</span></span><span class="line"><span class="cl">---
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="gh"># Content starts here
+</span></span></span></code></pre><p>The <code>title</code> field will be used as the HTML page title.</p>
+<h2 id="extensions">Extensions</h2>
+<h3 id="phase-1-complete-">Phase 1 (Complete ✅)</h3>
+<ul>
+<li><strong>Tables</strong>: GitHub-style tables</li>
+<li><strong>Strikethrough</strong>: <code>~~text~~</code></li>
+<li><strong>Task Lists</strong>: <code>- [ ]</code> and <code>- [x]</code></li>
+<li><strong>Syntax Highlighting</strong>: Fenced code blocks with language tags</li>
+<li><strong>Auto Heading IDs</strong>: For anchor links</li>
+<li><strong>Footnotes</strong>: <code>[^1]</code> reference style footnotes</li>
+<li><strong>Definition Lists</strong>: Term and definition pairs</li>
+<li><strong>Typographer</strong>: Smart quotes, em/en dashes, ellipsis</li>
+<li><strong>Linkify</strong>: Auto-convert URLs to clickable links</li>
+</ul>
+<p>See <code>examples/extensions.md</code> for usage examples.</p>
+<h3 id="phase-2-complete-">Phase 2 (Complete ✅)</h3>
+<ul>
+<li><strong>Mermaid Diagrams</strong>: Flowcharts, sequence diagrams, gantt charts (use <code>--mermaid</code> flag)
+<ul>
+<li>Fullscreen mode with ⛶ button</li>
+<li>Theme-aware rendering</li>
+<li>Escape key to exit fullscreen</li>
+</ul>
+</li>
+<li><strong>Math Rendering</strong>: LaTeX-style equations with KaTeX (use <code>--math</code> flag)
+<ul>
+<li>Inline and block math support</li>
+<li>Full LaTeX syntax</li>
+</ul>
+</li>
+</ul>
+<p>See <code>examples/mermaid-demo.md</code> and <code>examples/math-demo.md</code> for examples.</p>
+<h2 id="examples">Examples</h2>
+<p>See <code>examples/</code> directory for sample markdown files:</p>
+<ul>
+<li><strong><code>showcase.md</code></strong> - Complete feature demonstration (all phases)</li>
+<li><strong><code>extensions.md</code></strong> - Phase 1 features (footnotes, definition lists, etc.)</li>
+<li><strong><code>mermaid-demo.md</code></strong> - Mermaid diagram examples</li>
+<li><strong><code>math-demo.md</code></strong> - Math equation examples</li>
+<li><strong><code>combined-demo.md</code></strong> - Mermaid + Math together</li>
+<li><strong><code>sample.md</code></strong> - Basic markdown features</li>
+</ul>
+<p><strong>Quick start:</strong></p>
+<pre class="chroma"><code><span class="line"><span class="cl">mkdown examples/showcase.md --mermaid --math
+</span></span><span class="line"><span class="cl">open examples/showcase.html
+</span></span></code></pre><h2 id="theming">Theming</h2>
+<p>mkdown uses a clean architecture with separated CSS:</p>
+<ul>
+<li><strong>Template</strong>: <code>internal/templates/default.html</code> (minimal HTML structure)</li>
+<li><strong>Dark theme</strong>: <code>internal/templates/dark.css</code> (default, GitHub dark palette)</li>
+<li><strong>Light theme</strong>: <code>internal/templates/light.css</code> (GitHub light palette)</li>
+</ul>
+<h3 id="using-themes">Using Themes</h3>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1"># Dark theme (default)</span>
+</span></span><span class="line"><span class="cl">mkdown input.md
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Light theme</span>
+</span></span><span class="line"><span class="cl">mkdown input.md --theme light
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Short flag</span>
+</span></span><span class="line"><span class="cl">mkdown input.md -t light
+</span></span></code></pre><p>Both themes include:</p>
+<ul>
+<li>GitHub-style typography and spacing</li>
+<li>Syntax highlighting (Monokai for dark, GitHub Light for light)</li>
+<li>Responsive tables, lists, and blockquotes</li>
+</ul>
+<p><strong>Planned features</strong>:</p>
+<ul>
+<li>Theme configuration via <code>~/.mkdown.yml</code></li>
+<li>Custom theme support (bring your own CSS)</li>
+</ul>
+<h2 id="project-structure">Project Structure</h2>
+<p>See <a href="PROJECT_STRUCTURE.md">PROJECT_STRUCTURE.md</a> for detailed folder organization and architecture.</p>
+<h2 id="license">License</h2>
+<p>MIT</p>
+
+</body>
+</html>
+
