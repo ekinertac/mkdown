@@ -28,6 +28,12 @@ Or build from source:
 git clone https://github.com/ekinertac/mkdown.git
 cd mkdown
 go build
+
+# Run tests
+make test
+
+# Or with coverage
+make test-coverage
 ```
 
 ## Usage
@@ -50,14 +56,18 @@ mkdown <input.md> [flags]
 Flags:
   -o, --output <path>  Output file path (default: input filename with .html extension)
   -t, --theme <name>   Theme to use: dark (default), light
+  --mermaid            Enable Mermaid diagram support (requires internet)
+  --math               Enable math rendering with KaTeX (requires internet)
   -v, --version        Show version number
   -h, --help          Show help message
 
 Examples:
-  mkdown README.md                    # Creates README.html (dark theme)
-  mkdown doc.md -o output.html       # Custom output path
-  mkdown doc.md --theme light        # Use light theme
-  mkdown doc.md -t light -o out.html # Light theme + custom output
+  mkdown README.md                          # Creates README.html (dark theme)
+  mkdown doc.md -o output.html             # Custom output path
+  mkdown doc.md --theme light              # Use light theme
+  mkdown diagram.md --mermaid              # Enable Mermaid diagrams
+  mkdown math.md --math                    # Enable math rendering
+  mkdown doc.md --mermaid --math --theme light  # All features
 ```
 
 ### Configuration
@@ -85,23 +95,52 @@ The `title` field will be used as the HTML page title.
 
 ## Extensions
 
+### Phase 1 (Complete ✅)
+
 - **Tables**: GitHub-style tables
 - **Strikethrough**: `~~text~~`
 - **Task Lists**: `- [ ]` and `- [x]`
 - **Syntax Highlighting**: Fenced code blocks with language tags
 - **Auto Heading IDs**: For anchor links
+- **Footnotes**: `[^1]` reference style footnotes
+- **Definition Lists**: Term and definition pairs
+- **Typographer**: Smart quotes, em/en dashes, ellipsis
+- **Linkify**: Auto-convert URLs to clickable links
+
+See `examples/extensions.md` for usage examples.
+
+### Phase 2 (Complete ✅)
+
+- **Mermaid Diagrams**: Flowcharts, sequence diagrams, gantt charts (use `--mermaid` flag)
+- **Math Rendering**: LaTeX-style equations with KaTeX (use `--math` flag)
+
+See `examples/mermaid-demo.md` and `examples/math-demo.md` for examples.
 
 ## Examples
 
-See `examples/` directory for sample markdown files.
+See `examples/` directory for sample markdown files:
+
+- **`showcase.md`** - Complete feature demonstration (all phases)
+- **`extensions.md`** - Phase 1 features (footnotes, definition lists, etc.)
+- **`mermaid-demo.md`** - Mermaid diagram examples
+- **`math-demo.md`** - Math equation examples
+- **`combined-demo.md`** - Mermaid + Math together
+- **`sample.md`** - Basic markdown features
+
+**Quick start:**
+
+```bash
+mkdown examples/showcase.md --mermaid --math
+open examples/showcase.html
+```
 
 ## Theming
 
 mkdown uses a clean architecture with separated CSS:
 
-- **Template**: `templates/default.html` (minimal HTML structure)
-- **Dark theme**: `templates/dark.css` (default, GitHub dark palette)
-- **Light theme**: `templates/light.css` (GitHub light palette)
+- **Template**: `internal/templates/default.html` (minimal HTML structure)
+- **Dark theme**: `internal/templates/dark.css` (default, GitHub dark palette)
+- **Light theme**: `internal/templates/light.css` (GitHub light palette)
 
 ### Using Themes
 
@@ -127,9 +166,9 @@ Both themes include:
 - Theme configuration via `~/.mkdown.yml`
 - Custom theme support (bring your own CSS)
 
-## Architecture
+## Project Structure
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details.
+See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for detailed folder organization and architecture.
 
 ## License
 

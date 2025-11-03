@@ -29,3 +29,7 @@ Thumbs.db
 # Generated HTML files in examples
 examples/*.html
 
+# Test coverage
+coverage.out
+coverage.html
+
