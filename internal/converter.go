@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/alecthomas/chroma/v2/formatters/html"
@@ -129,6 +130,14 @@ func (c *Converter) Convert(inputPath, outputPath string) error {
 	var output bytes.Buffer
 	if err := c.template.Execute(&output, doc); err != nil {
 		return err
+	}
+
+	// Create output directory if it doesn't exist
+	outputDir := filepath.Dir(outputPath)
+	if outputDir != "" && outputDir != "." {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			return fmt.Errorf("failed to create output directory: %w", err)
+		}
 	}
 
 	// Write output file

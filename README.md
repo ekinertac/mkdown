@@ -64,6 +64,7 @@ Flags:
 Examples:
   mkdown README.md                          # Creates README.html (dark theme)
   mkdown doc.md -o output.html             # Custom output path
+  mkdown doc.md -o dist/output.html        # Creates dist/ directory if needed
   mkdown doc.md --theme light              # Use light theme
   mkdown diagram.md --mermaid              # Enable Mermaid diagrams
   mkdown math.md --math                    # Enable math rendering
