@@ -19,7 +19,7 @@ mkdown doc.md -o out.html   # Custom output
 ## Installation
 
 ```bash
-go install github.com/ekinertac/mkdown@latest
+go install github.com/ekinertac/mkdown/cmd/mkdown@latest
 ```
 
 Or build from source:
