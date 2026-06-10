@@ -107,9 +107,12 @@ func (c *Converter) Convert(inputPath, outputPath string) error {
 	// Parse frontmatter
 	doc, markdownContent := c.parseFrontmatter(source)
 
-	// Protect math blocks if math is enabled
+	// Protect math blocks if math is enabled. The placeholder map is kept
+	// local to this call so Convert is reentrant and safe to run from many
+	// goroutines concurrently (batch mode).
+	var mathBlocks map[int]string
 	if c.enableMath {
-		markdownContent = c.protectMathBlocks(markdownContent)
+		markdownContent, mathBlocks = c.protectMathBlocks(markdownContent)
 	}
 
 	// Convert markdown to HTML
@@ -122,7 +125,7 @@ func (c *Converter) Convert(inputPath, outputPath string) error {
 
 	// Restore math blocks
 	if c.enableMath {
-		htmlContent = c.restoreMathBlocks(htmlContent)
+		htmlContent = c.restoreMathBlocks(htmlContent, mathBlocks)
 	}
 
 	doc.Content = template.HTML(htmlContent)
@@ -199,22 +202,18 @@ func (c *Converter) parseFrontmatter(source []byte) (*Document, []byte) {
 }
 
 var mathBlockPlaceholder = "<!--MATH_BLOCK_%d-->"
-var mathBlocks = make(map[int]string)
-var mathBlockCounter = 0
 
-func (c *Converter) protectMathBlocks(markdown []byte) []byte {
+func (c *Converter) protectMathBlocks(markdown []byte) ([]byte, map[int]string) {
 	content := string(markdown)
-	
-	// Reset for each conversion
-	mathBlocks = make(map[int]string)
-	mathBlockCounter = 0
-	
+	mathBlocks := make(map[int]string)
+
 	// Find and replace $$ blocks
 	parts := strings.Split(content, "$$")
 	if len(parts) < 3 {
-		return markdown // No $$ blocks found
+		return markdown, mathBlocks // No $$ blocks found
 	}
-	
+
+	counter := 0
 	var result []string
 	for i := 0; i < len(parts); i++ {
 		if i%2 == 0 {
@@ -222,17 +221,17 @@ func (c *Converter) protectMathBlocks(markdown []byte) []byte {
 			result = append(result, parts[i])
 		} else {
 			// Inside math block
-			placeholder := fmt.Sprintf(mathBlockPlaceholder, mathBlockCounter)
-			mathBlocks[mathBlockCounter] = parts[i]
-			mathBlockCounter++
+			placeholder := fmt.Sprintf(mathBlockPlaceholder, counter)
+			mathBlocks[counter] = parts[i]
+			counter++
 			result = append(result, placeholder)
 		}
 	}
-	
-	return []byte(strings.Join(result, ""))
+
+	return []byte(strings.Join(result, "")), mathBlocks
 }
 
-func (c *Converter) restoreMathBlocks(html string) string {
+func (c *Converter) restoreMathBlocks(html string, mathBlocks map[int]string) string {
 	for id, content := range mathBlocks {
 		placeholder := fmt.Sprintf(mathBlockPlaceholder, id)
 		// Wrap in proper math delimiters

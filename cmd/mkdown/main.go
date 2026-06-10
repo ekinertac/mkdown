@@ -1,10 +1,24 @@
+// main.go — CLI entry point for mkdown, the markdown-to-HTML converter.
+//
+// Responsible for flag parsing and orchestrating conversions. A single input
+// file keeps the original detailed behavior (honors -o, prints the generated
+// path). Multiple input files are converted concurrently through a worker pool
+// sized to the CPU count — this is where the win for large batches comes from,
+// since per-file conversion is CPU-bound and independent. The shared Converter
+// is safe for concurrent use: goldmark is reentrant and internal.Convert keeps
+// all per-conversion state local (see internal/converter.go).
 package main
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/debug"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/ekinertac/mkdown/internal"
 )
@@ -12,11 +26,17 @@ import (
 const version = "0.1.0"
 
 func main() {
+	// Conversion is allocation-heavy and the process is short-lived, so let the
+	// heap grow further between collections to trade some memory for speed.
+	// Live memory stays bounded by the number of concurrent workers (not the
+	// batch size), so this is safe even for very large batches.
+	debug.SetGCPercent(400)
+
 	// Parse flags manually to allow flags after positional args
 	var (
 		showVersion   bool
 		outputPath    string
-		inputPath     string
+		inputPaths    []string
 		theme         = "dark" // default theme
 		enableMermaid bool
 		enableMath    bool
@@ -52,9 +72,9 @@ func main() {
 		case "--math":
 			enableMath = true
 		case "-h", "--help":
-			fmt.Println("Usage: mkdown <input.md> [flags]")
+			fmt.Println("Usage: mkdown <input.md>... [flags]")
 			fmt.Println("\nFlags:")
-			fmt.Println("  -o, --output <path>  Output file path (default: input file name with .html extension)")
+			fmt.Println("  -o, --output <path>  Output file path (single input only; default: input name with .html)")
 			fmt.Println("  -t, --theme <name>   Theme to use: dark (default), light")
 			fmt.Println("  --mermaid            Enable Mermaid diagram support (requires internet)")
 			fmt.Println("  --math               Enable math rendering with KaTeX (requires internet)")
@@ -64,14 +84,14 @@ func main() {
 			fmt.Println("  mkdown README.md")
 			fmt.Println("  mkdown input.md -o output.html")
 			fmt.Println("  mkdown doc.md --theme light")
+			fmt.Println("  mkdown *.md                  # batch: converts every file in parallel")
 			fmt.Println("  mkdown diagram.md --mermaid")
 			fmt.Println("  mkdown math.md --math")
-			fmt.Println("  mkdown doc.md --mermaid --math --theme light")
 			os.Exit(0)
 		default:
-			if !strings.HasPrefix(arg, "-") && inputPath == "" {
-				inputPath = arg
-			} else if strings.HasPrefix(arg, "-") {
+			if !strings.HasPrefix(arg, "-") {
+				inputPaths = append(inputPaths, arg)
+			} else {
 				fmt.Fprintf(os.Stderr, "Error: Unknown flag: %s\n", arg)
 				os.Exit(1)
 			}
@@ -83,54 +103,110 @@ func main() {
 		os.Exit(0)
 	}
 
-	if inputPath == "" {
-		fmt.Fprintln(os.Stderr, "Usage: mkdown <input.md> [-o output.html]")
+	if len(inputPaths) == 0 {
+		fmt.Fprintln(os.Stderr, "Usage: mkdown <input.md>... [-o output.html]")
 		fmt.Fprintln(os.Stderr, "Example: mkdown README.md")
 		os.Exit(1)
 	}
 
-	// Validate input file exists and is markdown
-	if _, err := os.Stat(inputPath); os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Error: File '%s' not found\n", inputPath)
+	if outputPath != "" && len(inputPaths) > 1 {
+		fmt.Fprintln(os.Stderr, "Error: -o cannot be used with multiple input files")
 		os.Exit(1)
 	}
 
-	if !strings.HasSuffix(strings.ToLower(inputPath), ".md") && 
-	   !strings.HasSuffix(strings.ToLower(inputPath), ".markdown") {
-		fmt.Fprintf(os.Stderr, "Error: Input file must be a markdown file (.md or .markdown)\n")
-		os.Exit(1)
+	// Validate every input up front so the batch fails fast on a bad path.
+	for _, in := range inputPaths {
+		if _, err := os.Stat(in); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "Error: File '%s' not found\n", in)
+			os.Exit(1)
+		}
+		lower := strings.ToLower(in)
+		if !strings.HasSuffix(lower, ".md") && !strings.HasSuffix(lower, ".markdown") {
+			fmt.Fprintf(os.Stderr, "Error: Input file must be a markdown file (.md or .markdown): %s\n", in)
+			os.Exit(1)
+		}
 	}
 
-	// Determine output path
-	if outputPath == "" {
-		ext := filepath.Ext(inputPath)
-		outputPath = strings.TrimSuffix(inputPath, ext) + ".html"
-	}
-
-	// Convert
 	converter := internal.NewConverterWithOptions(internal.ConverterOptions{
 		Theme:         theme,
 		EnableMermaid: enableMermaid,
 		EnableMath:    enableMath,
 	})
-	if err := converter.Convert(inputPath, outputPath); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+
+	// Single file: keep the original, chatty behavior.
+	if len(inputPaths) == 1 {
+		out := outputPath
+		if out == "" {
+			out = outputFor(inputPaths[0])
+		}
+		if err := converter.Convert(inputPaths[0], out); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✓ Generated: %s (theme: %s%s)\n", out, theme, featureSuffix(enableMermaid, enableMath))
+		return
 	}
 
-	var features []string
-	if enableMermaid {
-		features = append(features, "mermaid")
-	}
-	if enableMath {
-		features = append(features, "math")
-	}
-
-	featureStr := ""
-	if len(features) > 0 {
-		featureStr = fmt.Sprintf(" [%s]", strings.Join(features, ", "))
-	}
-
-	fmt.Printf("✓ Generated: %s (theme: %s%s)\n", outputPath, theme, featureStr)
+	// Batch: convert all inputs concurrently with a bounded worker pool.
+	runBatch(converter, inputPaths, theme, enableMermaid, enableMath)
 }
 
+// runBatch converts many files in parallel and prints a summary. The converter
+// is shared across workers; each Convert call is self-contained.
+func runBatch(converter *internal.Converter, inputPaths []string, theme string, mermaid, math bool) {
+	workers := runtime.NumCPU()
+	if workers > len(inputPaths) {
+		workers = len(inputPaths)
+	}
+
+	jobs := make(chan string)
+	var wg sync.WaitGroup
+	var failed int32
+
+	start := time.Now()
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for in := range jobs {
+				if err := converter.Convert(in, outputFor(in)); err != nil {
+					fmt.Fprintf(os.Stderr, "Error converting %s: %v\n", in, err)
+					atomic.AddInt32(&failed, 1)
+				}
+			}
+		}()
+	}
+	for _, in := range inputPaths {
+		jobs <- in
+	}
+	close(jobs)
+	wg.Wait()
+
+	elapsed := time.Since(start)
+	ok := len(inputPaths) - int(failed)
+	fmt.Printf("✓ Converted %d/%d files in %s (theme: %s%s, %d workers)\n",
+		ok, len(inputPaths), elapsed.Round(time.Millisecond), theme, featureSuffix(mermaid, math), workers)
+	if failed > 0 {
+		os.Exit(1)
+	}
+}
+
+// outputFor maps an input markdown path to its sibling .html output path.
+func outputFor(inputPath string) string {
+	ext := filepath.Ext(inputPath)
+	return strings.TrimSuffix(inputPath, ext) + ".html"
+}
+
+func featureSuffix(mermaid, math bool) string {
+	var features []string
+	if mermaid {
+		features = append(features, "mermaid")
+	}
+	if math {
+		features = append(features, "math")
+	}
+	if len(features) == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" [%s]", strings.Join(features, ", "))
+}
