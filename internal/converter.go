@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bufio"
 	"bytes"
 	_ "embed"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/yuin/goldmark"
@@ -117,14 +119,20 @@ func (c *Converter) Convert(inputPath, outputPath string) error {
 
 	// Convert markdown to HTML. A fresh parse context per call carries our
 	// faster heading-ID generator (see headingids.go) and keeps ID state
-	// local, so concurrent conversions don't share it.
-	var buf bytes.Buffer
+	// local, so concurrent conversions don't share it. The output buffer is
+	// pooled so batch conversions reuse capacity instead of re-growing one per
+	// file — buffer growth was a top allocator under the GC.
+	buf := bufPool.Get().(*bytes.Buffer)
+	buf.Reset()
 	pc := parser.NewContext(parser.WithIDs(newFastIDs()))
-	if err := c.markdown.Convert(markdownContent, &buf, parser.WithContext(pc)); err != nil {
+	if err := c.markdown.Convert(markdownContent, buf, parser.WithContext(pc)); err != nil {
+		bufPool.Put(buf)
 		return err
 	}
 
+	// String() copies, so the buffer can go back to the pool immediately.
 	htmlContent := buf.String()
+	bufPool.Put(buf)
 
 	// Restore math blocks
 	if c.enableMath {
@@ -136,12 +144,6 @@ func (c *Converter) Convert(inputPath, outputPath string) error {
 	// Inject scripts if needed
 	c.injectScripts(doc, markdownContent)
 
-	// Render template
-	var output bytes.Buffer
-	if err := c.template.Execute(&output, doc); err != nil {
-		return err
-	}
-
 	// Create output directory if it doesn't exist
 	outputDir := filepath.Dir(outputPath)
 	if outputDir != "" && outputDir != "." {
@@ -150,9 +152,27 @@ func (c *Converter) Convert(inputPath, outputPath string) error {
 		}
 	}
 
-	// Write output file
-	return os.WriteFile(outputPath, output.Bytes(), 0644)
+	// Stream the templated HTML straight to the file through a buffered writer,
+	// avoiding a second in-memory copy of the whole rendered document.
+	f, err := os.Create(outputPath)
+	if err != nil {
+		return err
+	}
+	bw := bufio.NewWriterSize(f, 32*1024)
+	if err := c.template.Execute(bw, doc); err != nil {
+		f.Close()
+		return err
+	}
+	if err := bw.Flush(); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
+
+// bufPool recycles the markdown→HTML buffers across conversions. Buffers can be
+// large (output size), but the live count is bounded by concurrent workers.
+var bufPool = sync.Pool{New: func() interface{} { return new(bytes.Buffer) }}
 
 func (c *Converter) parseFrontmatter(source []byte) (*Document, []byte) {
 	// Select theme CSS
