@@ -72,6 +72,10 @@ func NewConverterWithOptions(opts ConverterOptions) *Converter {
 					html.WithLineNumbers(false),
 				),
 			),
+			// Bypass chroma for fences it has no lexer for (e.g. mermaid).
+			// See codeblock.go — avoids chroma's per-block filename-glob
+			// fallback that otherwise dominates runtime on such documents.
+			newPassthroughExtension(),
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),
