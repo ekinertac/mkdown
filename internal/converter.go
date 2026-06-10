@@ -162,10 +162,12 @@ func (c *Converter) parseFrontmatter(source []byte) (*Document, []byte) {
 	}
 
 	content := source
-	str := string(source)
 
-	// Check for YAML frontmatter (--- at start)
-	if strings.HasPrefix(str, "---\n") || strings.HasPrefix(str, "---\r\n") {
+	// Check for YAML frontmatter (--- at start). Only stringify the source
+	// when a frontmatter marker is actually present — otherwise this copies
+	// the entire (potentially multi-MB) document for nothing.
+	if bytes.HasPrefix(source, []byte("---\n")) || bytes.HasPrefix(source, []byte("---\r\n")) {
+		str := string(source)
 		parts := strings.SplitN(str, "\n", 2)
 		if len(parts) == 2 {
 			rest := parts[1]
@@ -243,10 +245,11 @@ func (c *Converter) restoreMathBlocks(html string) string {
 
 func (c *Converter) injectScripts(doc *Document, markdown []byte) {
 	var scripts []string
-	content := string(markdown)
 
-	// Check for Mermaid diagrams
-	if c.enableMermaid && strings.Contains(content, "```mermaid") {
+	// Scan the raw bytes directly. The feature guards short-circuit, so in the
+	// default path (no mermaid/math) we touch the document not at all, instead
+	// of copying it to a string up front.
+	if c.enableMermaid && bytes.Contains(markdown, []byte("```mermaid")) {
 		mermaidTheme := "dark"
 		if c.theme == "light" {
 			mermaidTheme = "default"
@@ -256,7 +259,7 @@ func (c *Converter) injectScripts(doc *Document, markdown []byte) {
 	}
 
 	// Check for Math expressions
-	if c.enableMath && (strings.Contains(content, "$$") || strings.Contains(content, "$")) {
+	if c.enableMath && (bytes.Contains(markdown, []byte("$$")) || bytes.Contains(markdown, []byte("$"))) {
 		scripts = append(scripts, GetKatexScript())
 	}
 
