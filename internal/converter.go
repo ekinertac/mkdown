@@ -115,9 +115,12 @@ func (c *Converter) Convert(inputPath, outputPath string) error {
 		markdownContent, mathBlocks = c.protectMathBlocks(markdownContent)
 	}
 
-	// Convert markdown to HTML
+	// Convert markdown to HTML. A fresh parse context per call carries our
+	// faster heading-ID generator (see headingids.go) and keeps ID state
+	// local, so concurrent conversions don't share it.
 	var buf bytes.Buffer
-	if err := c.markdown.Convert(markdownContent, &buf); err != nil {
+	pc := parser.NewContext(parser.WithIDs(newFastIDs()))
+	if err := c.markdown.Convert(markdownContent, &buf, parser.WithContext(pc)); err != nil {
 		return err
 	}
 
