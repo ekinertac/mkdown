@@ -11,7 +11,7 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   line-height: 1.6;
-  max-width: 800px;
+  max-width: 980px;
   margin: 0 auto;
   padding: 2rem;
   color: #e6edf3;
@@ -498,20 +498,28 @@ sup {
 </head>
 <body>
     <h1 id="mkdown">mkdown</h1>
-<p>A simple, fast markdown to HTML converter with a clean default template.</p>
+<p>A fast, single-binary markdown to HTML converter that produces complete,
+self-contained styled pages — syntax highlighting and theme CSS included, with
+no runtime to install. Core conversion works fully offline (the optional
+<code>--mermaid</code> and <code>--math</code> features load a CDN).</p>
 <pre class="chroma"><code><span class="line"><span class="cl">mkdown input.md              <span class="c1"># Converts to input.html</span>
-</span></span><span class="line"><span class="cl">mkdown doc.md -o out.html   <span class="c1"># Custom output</span>
+</span></span><span class="line"><span class="cl">mkdown doc.md -o out.html    <span class="c1"># Custom output</span>
+</span></span><span class="line"><span class="cl">mkdown *.md                  <span class="c1"># Batch: every file, converted in parallel</span>
+</span></span><span class="line"><span class="cl">mkdown *.md --no-highlight   <span class="c1"># Skip highlighting for maximum throughput</span>
 </span></span></code></pre><h2 id="features">Features</h2>
 <ul>
-<li>Single binary, no dependencies</li>
-<li>GitHub Flavored Markdown support (tables, strikethrough, task lists)</li>
-<li>Syntax highlighting with Chroma</li>
+<li><strong>Single static binary, no runtime</strong> — no Node, Python, or Ruby to install</li>
+<li><strong>Self-contained output</strong> — theme CSS embedded inline; one portable <code>.html</code> file</li>
+<li><strong>Fast parallel batch</strong> — <code>mkdown *.md</code> converts a whole directory in one
+process across all available cores (see <a href="#performance">Performance</a>)</li>
+<li>GitHub Flavored Markdown (tables, strikethrough, task lists)</li>
+<li>Syntax highlighting with Chroma (or <code>--no-highlight</code> to skip it)</li>
 <li>Frontmatter parsing (YAML)</li>
 <li>Dark theme by default (light theme available)</li>
 <li>Separated CSS for easy theming</li>
 </ul>
 <h2 id="installation">Installation</h2>
-<pre class="chroma"><code><span class="line"><span class="cl">go install github.com/ekinertac/mkdown@latest
+<pre class="chroma"><code><span class="line"><span class="cl">go install github.com/ekinertac/mkdown/cmd/mkdown@latest
 </span></span></code></pre><p>Or build from source:</p>
 <pre class="chroma"><code><span class="line"><span class="cl">git clone https://github.com/ekinertac/mkdown.git
 </span></span><span class="line"><span class="cl"><span class="nb">cd</span> mkdown
@@ -527,14 +535,24 @@ sup {
 <p>Convert a markdown file to HTML:</p>
 <pre class="chroma"><code><span class="line"><span class="cl">mkdown input.md
 </span></span></code></pre><p>This creates <code>input.html</code> in the same directory.</p>
+<h3 id="batch-conversion">Batch Conversion</h3>
+<p>Pass multiple files (a glob works) and mkdown converts them concurrently in a
+single process, sized to the available CPU budget:</p>
+<pre class="chroma"><code><span class="line"><span class="cl">mkdown *.md                  <span class="c1"># Convert every .md in the directory</span>
+</span></span><span class="line"><span class="cl">mkdown docs/**/*.md          <span class="c1"># With shell globstar enabled</span>
+</span></span></code></pre><p>Each file is written next to its source (<code>foo.md</code> → <code>foo.html</code>). Because it
+runs as one process across a worker pool, batch conversion avoids the per-file
+startup cost a shell loop (<code>for f in *.md; ...</code>) would pay. <code>-o</code> is only valid
+with a single input.</p>
 <h3 id="cli-flags">CLI Flags</h3>
-<pre><code>mkdown &lt;input.md&gt; [flags]
+<pre><code>mkdown &lt;input.md&gt;... [flags]
 
 Flags:
-  -o, --output &lt;path&gt;  Output file path (default: input filename with .html extension)
+  -o, --output &lt;path&gt;  Output file path (single input only; default: input name with .html)
   -t, --theme &lt;name&gt;   Theme to use: dark (default), light
   --mermaid            Enable Mermaid diagram support (requires internet)
   --math               Enable math rendering with KaTeX (requires internet)
+  --no-highlight       Skip syntax highlighting (faster; code renders as plain &lt;pre&gt;&lt;code&gt;)
   -v, --version        Show version number
   -h, --help          Show help message
 
@@ -543,6 +561,8 @@ Examples:
   mkdown doc.md -o output.html             # Custom output path
   mkdown doc.md -o dist/output.html        # Creates dist/ directory if needed
   mkdown doc.md --theme light              # Use light theme
+  mkdown *.md                              # Batch convert, in parallel
+  mkdown *.md --no-highlight               # Batch, max throughput
   mkdown diagram.md --mermaid              # Enable Mermaid diagrams
   mkdown math.md --math                    # Enable math rendering
   mkdown doc.md --mermaid --math --theme light  # All features
@@ -554,6 +574,91 @@ Examples:
 <li>Default output paths</li>
 <li>Extension preferences</li>
 </ul>
+<h2 id="performance">Performance</h2>
+<p>mkdown is built to turn a pile of markdown into a pile of finished, styled,
+highlighted HTML pages, fast. Unlike bare CommonMark parsers it emits a
+complete standalone document (theme CSS inline, syntax highlighting applied),
+and unlike <code>pandoc</code> it carries no runtime and parallelizes batches itself.</p>
+<p>Numbers below are from <code>hyperfine</code> (warmup runs, mean of many) on a 10-core
+machine. &ldquo;Full doc + HL&rdquo; means a complete standalone HTML page <em>with</em> syntax
+highlighting; &ldquo;fragment&rdquo; means a bare HTML snippet with no document wrapper,
+CSS, or highlighting.</p>
+<p><strong>Single realistic file (~10 KB):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Time</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>mkdown</strong></td>
+<td><strong>9 ms</strong></td>
+<td><strong>full doc + HL</strong></td>
+</tr>
+<tr>
+<td>pandoc</td>
+<td>53 ms</td>
+<td>full doc + HL</td>
+</tr>
+<tr>
+<td>markdown-it / python-markdown</td>
+<td>~52 ms</td>
+<td>fragment</td>
+</tr>
+<tr>
+<td>cmark-gfm (C) / comrak (Rust)</td>
+<td>2–6 ms</td>
+<td>fragment</td>
+</tr>
+</tbody>
+</table>
+<p>mkdown produces a finished, styled page faster than the runtime-based tools
+emit even a bare fragment. The C/Rust engines are faster at raw parsing, but
+they output fragments — adding highlighting and a document wrapper to match
+mkdown&rsquo;s output erases the gap.</p>
+<p><strong>Batch — 200 realistic files</strong> (mkdown&rsquo;s native pool vs others under <code>xargs -P</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Time</th>
+<th>vs mkdown</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>mkdown</strong> (full doc + HL)</td>
+<td><strong>36 ms</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>mkdown &ndash;no-highlight</strong></td>
+<td><strong>22 ms</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>cmark-gfm, parallel (fragment)</td>
+<td>239 ms</td>
+<td>6.7× slower</td>
+</tr>
+<tr>
+<td>pandoc, parallel (full doc + HL)</td>
+<td>1.8 s</td>
+<td>50× slower</td>
+</tr>
+</tbody>
+</table>
+<p>The batch win comes from running one process for all files (no per-file
+startup) on top of in-process parallelism.</p>
+<p><strong>Constrained environments.</strong> The pool sizes itself to <code>GOMAXPROCS</code>, so it
+respects container CPU quotas (CI runners, Kubernetes limits) instead of
+oversubscribing host cores. On a single core mkdown loses the parallel speedup
+but keeps the structural lead — a 200-file batch still finishes in ~100 ms,
+ahead of every alternative. <code>--no-highlight</code> helps most here, since
+highlighting is the bulk of per-file CPU.</p>
 <h2 id="frontmatter">Frontmatter</h2>
 <p>Add metadata to your markdown files:</p>
 <pre class="chroma"><code><span class="line"><span class="cl">---
