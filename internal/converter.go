@@ -49,6 +49,11 @@ type ConverterOptions struct {
 	Theme         string
 	EnableMermaid bool
 	EnableMath    bool
+	// DisableHighlight skips chroma syntax highlighting of code blocks. Code
+	// still renders (as plain <pre><code>), just without colour. Highlighting
+	// is roughly two-thirds of conversion time, so this is a large speedup for
+	// bulk-converting code-heavy documents that don't need coloured output.
+	DisableHighlight bool
 }
 
 func NewConverter(theme string) *Converter {
@@ -60,13 +65,20 @@ func NewConverter(theme string) *Converter {
 }
 
 func NewConverterWithOptions(opts ConverterOptions) *Converter {
-	md := goldmark.New(
-		goldmark.WithExtensions(
-			extension.GFM, // GitHub Flavored Markdown (includes tables, strikethrough, task lists)
-			extension.Footnote,
-			extension.DefinitionList,
-			extension.Typographer,
-			extension.Linkify,
+	extensions := []goldmark.Extender{
+		extension.GFM, // GitHub Flavored Markdown (includes tables, strikethrough, task lists)
+		extension.Footnote,
+		extension.DefinitionList,
+		extension.Typographer,
+		extension.Linkify,
+	}
+
+	// Syntax highlighting is the single most expensive stage. When disabled,
+	// code blocks fall through to goldmark's default plain <pre><code>
+	// renderer. The passthrough extension is only needed to keep chroma off
+	// unknown-language fences, so it is paired with highlighting.
+	if !opts.DisableHighlight {
+		extensions = append(extensions,
 			highlighting.NewHighlighting(
 				highlighting.WithStyle("monokai"),
 				highlighting.WithFormatOptions(
@@ -78,7 +90,11 @@ func NewConverterWithOptions(opts ConverterOptions) *Converter {
 			// See codeblock.go — avoids chroma's per-block filename-glob
 			// fallback that otherwise dominates runtime on such documents.
 			newPassthroughExtension(),
-		),
+		)
+	}
+
+	md := goldmark.New(
+		goldmark.WithExtensions(extensions...),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),
 		),

@@ -40,6 +40,7 @@ func main() {
 		theme         = "dark" // default theme
 		enableMermaid bool
 		enableMath    bool
+		noHighlight   bool
 	)
 
 	for i := 1; i < len(os.Args); i++ {
@@ -71,6 +72,8 @@ func main() {
 			enableMermaid = true
 		case "--math":
 			enableMath = true
+		case "--no-highlight":
+			noHighlight = true
 		case "-h", "--help":
 			fmt.Println("Usage: mkdown <input.md>... [flags]")
 			fmt.Println("\nFlags:")
@@ -78,6 +81,7 @@ func main() {
 			fmt.Println("  -t, --theme <name>   Theme to use: dark (default), light")
 			fmt.Println("  --mermaid            Enable Mermaid diagram support (requires internet)")
 			fmt.Println("  --math               Enable math rendering with KaTeX (requires internet)")
+			fmt.Println("  --no-highlight       Skip syntax highlighting (much faster for bulk/code-heavy docs)")
 			fmt.Println("  -v, --version        Show version")
 			fmt.Println("  -h, --help          Show this help")
 			fmt.Println("\nExamples:")
@@ -128,9 +132,10 @@ func main() {
 	}
 
 	converter := internal.NewConverterWithOptions(internal.ConverterOptions{
-		Theme:         theme,
-		EnableMermaid: enableMermaid,
-		EnableMath:    enableMath,
+		Theme:            theme,
+		EnableMermaid:    enableMermaid,
+		EnableMath:       enableMath,
+		DisableHighlight: noHighlight,
 	})
 
 	// Single file: keep the original, chatty behavior.
