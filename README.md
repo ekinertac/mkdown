@@ -5,6 +5,10 @@ self-contained styled pages — syntax highlighting and theme CSS included, with
 no runtime to install. Core conversion works fully offline (the optional
 `--mermaid` and `--math` features load a CDN).
 
+<p align="center">
+  <img src="demo/mkdown.gif" alt="mkdown converting a file and then a whole folder in parallel" width="720">
+</p>
+
 ```bash
 mkdown input.md              # Converts to input.html
 mkdown doc.md -o out.html    # Custom output
