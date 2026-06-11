@@ -6,7 +6,7 @@ no runtime to install. Core conversion works fully offline (the optional
 `--mermaid` and `--math` features load a CDN).
 
 <p align="center">
-  <img src="demo/mkdown.gif" alt="mkdown converting a file and then a whole folder in parallel" width="720">
+  <img src="demo/mkdown.gif" alt="mkdown converting 1000 markdown files to HTML in parallel in 404ms" width="720">
 </p>
 
 ```bash
