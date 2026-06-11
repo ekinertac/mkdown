@@ -159,7 +159,12 @@ func main() {
 // runBatch converts many files in parallel and prints a summary. The converter
 // is shared across workers; each Convert call is self-contained.
 func runBatch(converter *internal.Converter, inputPaths []string, theme string, mermaid, math bool) {
-	workers := runtime.NumCPU()
+	// Size the pool to GOMAXPROCS, not NumCPU. GOMAXPROCS (Go 1.25+) respects
+	// the cgroup CPU quota, so in a CPU-limited container or CI runner we don't
+	// oversubscribe the few cores we actually have with host-core-count workers;
+	// it also honors an explicit GOMAXPROCS override. On an unconstrained
+	// machine the two are equal.
+	workers := runtime.GOMAXPROCS(0)
 	if workers > len(inputPaths) {
 		workers = len(inputPaths)
 	}
