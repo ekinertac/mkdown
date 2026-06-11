@@ -1,0 +1,19 @@
+{
+  "name": "@mkdown/cli-linux-x64",
+  "version": "0.2.0",
+  "description": "mkdown binary for linux-x64",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ekinertac/mkdown.git"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin"
+  ]
+}

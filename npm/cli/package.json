@@ -1,0 +1,33 @@
+{
+  "name": "@mkdown/cli",
+  "version": "0.2.0",
+  "description": "Fast single-binary markdown to HTML converter (parallel batch, syntax highlighting, self-contained output)",
+  "keywords": [
+    "markdown",
+    "html",
+    "converter",
+    "cli",
+    "static-site",
+    "syntax-highlighting"
+  ],
+  "homepage": "https://github.com/ekinertac/mkdown",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ekinertac/mkdown.git"
+  },
+  "license": "MIT",
+  "bin": {
+    "mkdown": "bin/mkdown"
+  },
+  "files": [
+    "bin/mkdown"
+  ],
+  "optionalDependencies": {
+    "@mkdown/cli-darwin-arm64": "0.2.0",
+    "@mkdown/cli-darwin-x64": "0.2.0",
+    "@mkdown/cli-linux-arm64": "0.2.0",
+    "@mkdown/cli-linux-x64": "0.2.0",
+    "@mkdown/cli-win32-arm64": "0.2.0",
+    "@mkdown/cli-win32-x64": "0.2.0"
+  }
+}

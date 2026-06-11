@@ -1,0 +1,42 @@
+#!/usr/bin/env node
+// Launcher for the mkdown binary distributed via npm.
+//
+// The actual platform binaries ship in optional per-platform packages
+// (@mkdown/cli-darwin-arm64, ...-linux-x64, etc.) gated by npm "os"/"cpu"
+// fields, so npm installs only the one matching the host. This shim resolves
+// that package's binary and execs it, forwarding args, stdio, and exit code.
+// No network access or postinstall download is involved.
+"use strict";
+
+const { spawnSync } = require("child_process");
+
+function resolveBinary() {
+  const platform = process.platform; // 'darwin' | 'linux' | 'win32'
+  const arch = process.arch; // 'arm64' | 'x64'
+  const pkg = `@mkdown/cli-${platform}-${arch}`;
+  const exe = platform === "win32" ? "mkdown.exe" : "mkdown";
+  try {
+    return require.resolve(`${pkg}/bin/${exe}`);
+  } catch {
+    process.stderr.write(
+      `mkdown: no prebuilt binary for ${platform}-${arch}.\n` +
+        `Supported: darwin, linux, win32 on x64 and arm64.\n` +
+        `If you installed with --no-optional, reinstall without it.\n`
+    );
+    process.exit(1);
+  }
+}
+
+const result = spawnSync(resolveBinary(), process.argv.slice(2), {
+  stdio: "inherit",
+});
+
+if (result.error) {
+  process.stderr.write(`mkdown: ${result.error.message}\n`);
+  process.exit(1);
+}
+// Propagate signal-kills as a conventional 128+signal code.
+if (result.signal) {
+  process.exit(1);
+}
+process.exit(result.status ?? 0);

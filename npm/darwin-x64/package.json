@@ -1,0 +1,19 @@
+{
+  "name": "@mkdown/cli-darwin-x64",
+  "version": "0.2.0",
+  "description": "mkdown binary for darwin-x64",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ekinertac/mkdown.git"
+  },
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin"
+  ]
+}

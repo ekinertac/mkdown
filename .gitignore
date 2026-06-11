@@ -39,3 +39,9 @@ test-markdown/
 # goreleaser build output
 dist/
 
+# npm wrapper: platform binaries are rebuilt by npm/release.mjs at publish time
+# (keep the committed JS launcher in npm/cli/bin/mkdown)
+npm/*/bin/mkdown
+npm/*/bin/mkdown.exe
+!npm/cli/bin/mkdown
+

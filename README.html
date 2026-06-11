@@ -519,8 +519,17 @@ process across all available cores (see <a href="#performance">Performance</a>)<
 <li>Separated CSS for easy theming</li>
 </ul>
 <h2 id="installation">Installation</h2>
-<pre class="chroma"><code><span class="line"><span class="cl">go install github.com/ekinertac/mkdown/cmd/mkdown@latest
-</span></span></code></pre><p>Or build from source:</p>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1"># Homebrew (macOS / Linux)</span>
+</span></span><span class="line"><span class="cl">brew install ekinertac/tap/mkdown
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># npx — no install, no Go toolchain (great for Node/docs projects)</span>
+</span></span><span class="line"><span class="cl">npx @mkdown/cli input.md
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Go toolchain</span>
+</span></span><span class="line"><span class="cl">go install github.com/ekinertac/mkdown/cmd/mkdown@latest
+</span></span></code></pre><p>Prebuilt binaries for macOS, Linux, and Windows (amd64/arm64) are attached to
+each <a href="https://github.com/ekinertac/mkdown/releases">GitHub Release</a>.</p>
+<p>Or build from source:</p>
 <pre class="chroma"><code><span class="line"><span class="cl">git clone https://github.com/ekinertac/mkdown.git
 </span></span><span class="line"><span class="cl"><span class="nb">cd</span> mkdown
 </span></span><span class="line"><span class="cl">go build

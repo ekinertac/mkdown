@@ -27,8 +27,18 @@ mkdown *.md --no-highlight   # Skip highlighting for maximum throughput
 ## Installation
 
 ```bash
+# Homebrew (macOS / Linux)
+brew install ekinertac/tap/mkdown
+
+# npx — no install, no Go toolchain (great for Node/docs projects)
+npx @mkdown/cli input.md
+
+# Go toolchain
 go install github.com/ekinertac/mkdown/cmd/mkdown@latest
 ```
+
+Prebuilt binaries for macOS, Linux, and Windows (amd64/arm64) are attached to
+each [GitHub Release](https://github.com/ekinertac/mkdown/releases).
 
 Or build from source:
 
