@@ -1,0 +1,79 @@
+# goreleaser config — builds cross-platform binaries on each git tag and fans
+# them out to GitHub Releases and a Homebrew tap. The npm wrapper (npm/)
+# repackages these same release archives, so this file is the single source of
+# truth for the compiled artifacts.
+#
+# Local validation:   goreleaser check
+# Local dry run:       goreleaser release --snapshot --clean
+# Real release:        git tag v0.2.0 && git push origin v0.2.0  (CI runs it)
+version: 2
+
+project_name: mkdown
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: mkdown
+    main: ./cmd/mkdown
+    binary: mkdown
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    # Strip debug info and stamp build metadata into the vars in main.go.
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .Commit }}
+      - -X main.date={{ .Date }}
+
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+homebrew_casks:
+  - name: mkdown
+    repository:
+      owner: ekinertac
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: "https://github.com/ekinertac/mkdown"
+    description: "Fast single-binary markdown to HTML converter"
+    # Generated cask lands in ekinertac/homebrew-tap; users then run:
+    #   brew install ekinertac/tap/mkdown
+    # The binaries are not notarized, so strip the Gatekeeper quarantine flag
+    # on install to avoid "cannot be opened" errors on macOS.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/mkdown"]
+          end

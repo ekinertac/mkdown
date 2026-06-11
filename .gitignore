@@ -36,3 +36,6 @@ coverage.html
 # Local benchmarking / test scratch (generated corpora, file copies, outputs)
 test-markdown/
 
+# goreleaser build output
+dist/
+

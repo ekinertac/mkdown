@@ -1,0 +1,36 @@
+# Cuts a release on every pushed v* tag: goreleaser cross-compiles the
+# binaries, publishes a GitHub Release with archives + checksums, and updates
+# the Homebrew tap (ekinertac/homebrew-tap).
+#
+# Required repo secret: HOMEBREW_TAP_TOKEN — a fine-grained/classic PAT with
+# contents:write on ekinertac/homebrew-tap (the default GITHUB_TOKEN can only
+# write to THIS repo, not the separate tap). GITHUB_TOKEN is provided
+# automatically and is used to create the Release here.
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history + tags so changelog/version resolve
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

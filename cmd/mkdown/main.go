@@ -23,7 +23,13 @@ import (
 	"github.com/ekinertac/mkdown/internal"
 )
 
-const version = "0.1.0"
+// Build metadata, overridden at release time via -ldflags by goreleaser
+// (-X main.version=... etc.). Defaults apply to `go build`/`go install` builds.
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
 
 func main() {
 	// Conversion is allocation-heavy and the process is short-lived, so let the
@@ -103,7 +109,7 @@ func main() {
 	}
 
 	if showVersion {
-		fmt.Printf("mkdown v%s\n", version)
+		fmt.Printf("mkdown v%s (commit %s, built %s)\n", version, commit, date)
 		os.Exit(0)
 	}
 

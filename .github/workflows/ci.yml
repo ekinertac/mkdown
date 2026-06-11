@@ -1,0 +1,25 @@
+# Runs the test suite (with the race detector) on pushes and PRs so releases
+# are cut from a known-green tree.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: go build ./...
+      - run: go test -race ./...
+      - name: Validate goreleaser config
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check
