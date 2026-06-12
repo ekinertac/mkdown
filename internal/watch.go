@@ -20,6 +20,11 @@ import (
 // input file's modtime or size changes, polling every `interval`, until ctx is
 // cancelled. A render failure is reported to stderr but does not stop watching.
 func Watch(ctx context.Context, c *Converter, in, out string, interval time.Duration) error {
+	// Snapshot the file's signature before the initial render so that a save
+	// racing the initial Convert is still caught on the next tick (at worst one
+	// redundant render, never a missed/stale one).
+	lastMod, lastSize := statSig(in)
+
 	// Initial render so the output exists right away. A failure here is
 	// reported but not fatal — the user may be starting on a broken file.
 	if err := c.Convert(in, out); err != nil {
@@ -28,8 +33,6 @@ func Watch(ctx context.Context, c *Converter, in, out string, interval time.Dura
 		fmt.Printf("✓ Generated: %s\n", out)
 	}
 	fmt.Printf("watching %s → %s (Ctrl+C to stop)\n", in, out)
-
-	lastMod, lastSize := statSig(in)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()

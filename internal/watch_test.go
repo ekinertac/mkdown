@@ -81,6 +81,8 @@ func TestWatchNoRerenderWithoutChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Assumes sub-second filesystem modtime resolution (APFS/ext4); a
+	// coarse-resolution FS could mask a same-second rewrite.
 	if !info1.ModTime().Equal(info2.ModTime()) {
 		t.Fatal("output was rewritten despite no input change")
 	}
