@@ -1,6 +1,6 @@
 {
   "name": "@mkdown/cli-linux-x64",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "mkdown binary for linux-x64",
   "license": "MIT",
   "repository": {
