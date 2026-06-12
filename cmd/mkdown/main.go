@@ -10,8 +10,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
@@ -47,6 +49,7 @@ func main() {
 		enableMermaid bool
 		enableMath    bool
 		noHighlight   bool
+		watch         bool
 	)
 
 	for i := 1; i < len(os.Args); i++ {
@@ -80,6 +83,8 @@ func main() {
 			enableMath = true
 		case "--no-highlight":
 			noHighlight = true
+		case "--watch":
+			watch = true
 		case "-h", "--help":
 			fmt.Println("Usage: mkdown <input.md>... [flags]")
 			fmt.Println("\nFlags:")
@@ -88,6 +93,7 @@ func main() {
 			fmt.Println("  --mermaid            Enable Mermaid diagram support (requires internet)")
 			fmt.Println("  --math               Enable math rendering with KaTeX (requires internet)")
 			fmt.Println("  --no-highlight       Skip syntax highlighting (much faster for bulk/code-heavy docs)")
+			fmt.Println("  --watch              Re-render the file on every change (single file; Ctrl+C to stop)")
 			fmt.Println("  -v, --version        Show version")
 			fmt.Println("  -h, --help          Show this help")
 			fmt.Println("\nExamples:")
@@ -97,6 +103,7 @@ func main() {
 			fmt.Println("  mkdown *.md                  # batch: converts every file in parallel")
 			fmt.Println("  mkdown diagram.md --mermaid")
 			fmt.Println("  mkdown math.md --math")
+			fmt.Println("  mkdown --watch README.md     # re-render on save until Ctrl+C")
 			os.Exit(0)
 		default:
 			if !strings.HasPrefix(arg, "-") {
@@ -143,6 +150,25 @@ func main() {
 		EnableMath:       enableMath,
 		DisableHighlight: noHighlight,
 	})
+
+	// Watch mode: re-render a single file on every change until interrupted.
+	if watch {
+		if len(inputPaths) != 1 {
+			fmt.Fprintln(os.Stderr, "Error: --watch requires exactly one input file")
+			os.Exit(1)
+		}
+		out := outputPath
+		if out == "" {
+			out = outputFor(inputPaths[0])
+		}
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
+		if err := internal.Watch(ctx, converter, inputPaths[0], out, 250*time.Millisecond); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	// Single file: keep the original, chatty behavior.
 	if len(inputPaths) == 1 {
