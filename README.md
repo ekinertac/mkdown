@@ -96,6 +96,7 @@ Flags:
   --mermaid            Enable Mermaid diagram support (requires internet)
   --math               Enable math rendering with KaTeX (requires internet)
   --no-highlight       Skip syntax highlighting (faster; code renders as plain <pre><code>)
+  --watch              Re-render the file on every change (single file; Ctrl+C to stop)
   -v, --version        Show version number
   -h, --help          Show help message
 
@@ -106,6 +107,7 @@ Examples:
   mkdown doc.md --theme light              # Use light theme
   mkdown *.md                              # Batch convert, in parallel
   mkdown *.md --no-highlight               # Batch, max throughput
+  mkdown --watch README.md                 # re-render on save until Ctrl+C
   mkdown diagram.md --mermaid              # Enable Mermaid diagrams
   mkdown math.md --math                    # Enable math rendering
   mkdown doc.md --mermaid --math --theme light  # All features
