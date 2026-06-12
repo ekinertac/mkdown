@@ -164,6 +164,7 @@ func main() {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()
 		if err := internal.Watch(ctx, converter, inputPaths[0], out, 250*time.Millisecond); err != nil {
+			stop() // release the signal handler before exiting (os.Exit skips defers)
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
