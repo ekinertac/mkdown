@@ -55,3 +55,33 @@ func TestWatchRerendersOnChange(t *testing.T) {
 		t.Fatal("Watch did not return after context cancel")
 	}
 }
+
+func TestWatchNoRerenderWithoutChange(t *testing.T) {
+	dir := t.TempDir()
+	in := filepath.Join(dir, "doc.md")
+	out := filepath.Join(dir, "doc.html")
+	if err := os.WriteFile(in, []byte("# Stable"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewConverter("dark")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = Watch(ctx, c, in, out, 10*time.Millisecond) }()
+
+	waitForContains(t, out, "Stable")
+
+	info1, err := os.Stat(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Let many poll ticks pass with no change to the input file.
+	time.Sleep(150 * time.Millisecond)
+	info2, err := os.Stat(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info1.ModTime().Equal(info2.ModTime()) {
+		t.Fatal("output was rewritten despite no input change")
+	}
+}
