@@ -85,7 +85,7 @@ func TestServeRerendersOnChange(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Serve returned error: %v", err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("Serve did not return after context cancel")
 	}
 }

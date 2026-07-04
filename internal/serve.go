@@ -42,6 +42,10 @@ func Serve(ctx context.Context, c *Converter, in string, interval time.Duration,
 		fmt.Fprintf(w, "%d", h.getVersion())
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(h.getHTML())
 	})
