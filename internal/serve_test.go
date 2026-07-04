@@ -22,6 +22,16 @@ func httpGetBody(t *testing.T, url string) string {
 	return strings.TrimSpace(string(b))
 }
 
+func httpStatus(t *testing.T, url string) int {
+	t.Helper()
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("GET %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode
+}
+
 func waitForMtimeChange(t *testing.T, base, old string) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
@@ -34,7 +44,50 @@ func waitForMtimeChange(t *testing.T, base, old string) {
 	t.Fatalf("/__mtime never changed from %q", old)
 }
 
-func TestServeRerendersOnChange(t *testing.T) {
+// --- versionStore unit tests ---
+
+func TestVersionStoreAddAndDedup(t *testing.T) {
+	s := newVersionStore()
+	if !s.add([]byte("<h1>a</h1>"), "opened") {
+		t.Fatal("first add should append")
+	}
+	if s.headID() != 1 {
+		t.Fatalf("headID = %d, want 1", s.headID())
+	}
+	// Identical content must be deduped (no new version).
+	if s.add([]byte("<h1>a</h1>"), "edit") {
+		t.Fatal("identical content should be deduped")
+	}
+	if s.headID() != 1 {
+		t.Fatalf("headID after dedup = %d, want 1", s.headID())
+	}
+	// Different content appends.
+	if !s.add([]byte("<h1>b</h1>"), "edit") {
+		t.Fatal("changed content should append")
+	}
+	if s.headID() != 2 {
+		t.Fatalf("headID = %d, want 2", s.headID())
+	}
+	if got := string(s.head()); got != "<h1>b</h1>" {
+		t.Fatalf("head = %q, want <h1>b</h1>", got)
+	}
+	// Lookup by id.
+	if b, ok := s.get(1); !ok || string(b) != "<h1>a</h1>" {
+		t.Fatalf("get(1) = %q, %v", b, ok)
+	}
+	if _, ok := s.get(99); ok {
+		t.Fatal("get(99) should be not found")
+	}
+	// metaList is newest-first.
+	m := s.metaList()
+	if len(m) != 2 || m[0].ID != 2 || m[1].ID != 1 {
+		t.Fatalf("metaList order wrong: %+v", m)
+	}
+}
+
+// --- Serve integration test ---
+
+func TestServeVersionHistory(t *testing.T) {
 	dir := t.TempDir()
 	in := filepath.Join(dir, "doc.md")
 	if err := os.WriteFile(in, []byte("# First"), 0644); err != nil {
@@ -58,25 +111,46 @@ func TestServeRerendersOnChange(t *testing.T) {
 		t.Fatal("server never became ready")
 	}
 
-	body := httpGetBody(t, base+"/")
-	if !strings.Contains(body, "First") {
-		t.Fatalf("initial page missing content: %s", body)
-	}
-	if !strings.Contains(body, "/__mtime") {
-		t.Fatal("reload script not injected into served page")
-	}
-	if v := httpGetBody(t, base+"/__mtime"); v != "1" {
-		t.Fatalf("expected initial version 1, got %q", v)
+	// "/" is the shell (iframe + sidebar), NOT the document itself.
+	shell := httpGetBody(t, base+"/")
+	if !strings.Contains(shell, `id="content"`) || !strings.Contains(shell, "History") {
+		t.Fatalf("/ is not the shell page: %s", shell[:min2(300, len(shell))])
 	}
 
+	// The document lives at /__content.
+	if body := httpGetBody(t, base+"/__content"); !strings.Contains(body, "First") {
+		t.Fatalf("/__content missing initial content: %s", body)
+	}
+	if v := httpGetBody(t, base+"/__mtime"); v != "1" {
+		t.Fatalf("initial /__mtime = %q, want 1", v)
+	}
+
+	// Edit → a new version appears; the old snapshot stays viewable.
 	if err := os.WriteFile(in, []byte("# Second"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	waitForMtimeChange(t, base, "1")
 
-	body = httpGetBody(t, base+"/")
-	if !strings.Contains(body, "Second") {
-		t.Fatalf("page not re-rendered after change: %s", body)
+	if body := httpGetBody(t, base+"/__content"); !strings.Contains(body, "Second") {
+		t.Fatalf("/__content not updated: %s", body)
+	}
+	if body := httpGetBody(t, base+"/__version/1"); !strings.Contains(body, "First") {
+		t.Fatalf("/__version/1 should still show original: %s", body)
+	}
+	if s := httpStatus(t, base+"/__version/999"); s != http.StatusNotFound {
+		t.Fatalf("/__version/999 status = %d, want 404", s)
+	}
+	if s := httpStatus(t, base+"/nope"); s != http.StatusNotFound {
+		t.Fatalf("/nope status = %d, want 404", s)
+	}
+
+	// /__versions lists both, newest-first, with kinds.
+	versions := httpGetBody(t, base+"/__versions")
+	if !strings.Contains(versions, `"id":2`) || !strings.Contains(versions, `"id":1`) {
+		t.Fatalf("/__versions missing entries: %s", versions)
+	}
+	if !strings.Contains(versions, `"kind":"opened"`) || !strings.Contains(versions, `"kind":"edit"`) {
+		t.Fatalf("/__versions missing kinds: %s", versions)
 	}
 
 	cancel()
@@ -88,4 +162,11 @@ func TestServeRerendersOnChange(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Serve did not return after context cancel")
 	}
+}
+
+func min2(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

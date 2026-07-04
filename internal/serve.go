@@ -1,58 +1,94 @@
-// serve.go — `mkdown serve`: serve a single markdown file's rendered HTML on a
-// localhost port and auto-refresh the browser whenever the file changes.
+// serve.go — `mkdown serve`: live-preview HTTP server with a right-side version
+// history sidebar (sub-project A1, live versions only).
 //
-// The rendered page is held in memory (serveHolder) and re-rendered by a poll
-// goroutine using the same modtime+size change detection as Watch (see
-// watch.go's statSig). Each served page has a tiny script injected that polls
-// /__mtime and reloads when the version counter changes. Localhost-only, on an
-// OS-assigned free port. Wired up from cmd/mkdown/main.go; see
-// docs/superpowers/specs/2026-07-04-serve-mode-design.md.
+// The server serves a shell page (iframe + sidebar) at "/". The live document
+// and every past snapshot of this editing session live in an in-memory,
+// mutex-guarded versionStore; a poll goroutine (reusing watch.go's statSig)
+// re-renders on each file change and appends a version, deduping no-op saves.
+// The shell's JS fetches /__versions, polls /__mtime, and reloads only the
+// iframe when following the live head. Content served to the iframe is the
+// pristine Converter.Render output — no injection — so it equals the standalone
+// output. Localhost-only. Wired up from cmd/mkdown/main.go; see
+// docs/superpowers/specs/2026-07-04-serve-live-version-history-design.md.
 package internal
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"html"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
-// reloadScript is injected before </body> of every served page. It polls
-// /__mtime every 300ms and reloads the page when the version counter changes.
-const reloadScript = `<script>
-(function(){var v=null;setInterval(function(){fetch('/__mtime').then(function(r){return r.text()}).then(function(t){if(v!==null&&t!==v){location.reload()}v=t}).catch(function(){})},300)})();
-</script>`
+//go:embed serve_assets/shell.html
+var shellHTML []byte
 
-// Serve renders in and serves it on a localhost port, re-rendering and
-// signalling the browser to reload every time the file changes, until ctx is
-// cancelled. If ready is non-nil it is called once with the base URL
-// ("http://127.0.0.1:PORT") after the listener is bound — main uses it to open
-// the browser, tests use it to learn the assigned port. Change detection polls
-// modtime+size every interval, the same mechanism as Watch.
+// Serve renders in and serves it on a localhost port with a version-history
+// sidebar, appending a version on every content change and signalling the shell
+// to reload the preview, until ctx is cancelled. If ready is non-nil it is
+// called once with the base URL after the listener is bound (main opens the
+// browser; tests learn the port). Change detection polls modtime+size every
+// interval, the same mechanism as Watch.
 func Serve(ctx context.Context, c *Converter, in string, interval time.Duration, ready func(url string)) error {
 	// Snapshot the file signature before the initial render so a save racing
 	// that render is still caught on the next tick (at worst one redundant
 	// render, never a missed one). Mirrors the same fix in Watch.
 	mod, size := statSig(in)
 
-	h := &serveHolder{}
-	h.set(renderPage(c, in)) // initial render (or error page); version -> 1
+	store := newVersionStore()
+	store.add(renderContent(c, in), "opened") // version 1
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/__mtime", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(w, "%d", h.getVersion())
-	})
+
+	// The shell (sidebar + iframe). Root path only; everything unknown 404s.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(h.getHTML())
+		w.Write(shellHTML)
+	})
+
+	// The current live document (pristine), loaded by the iframe when following.
+	mux.HandleFunc("/__content", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(store.head())
+	})
+
+	// A specific snapshot's document (pristine).
+	mux.HandleFunc("/__version/", func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/__version/"))
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		b, ok := store.get(id)
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(b)
+	})
+
+	// The version timeline for the sidebar (metadata only, newest-first).
+	mux.HandleFunc("/__versions", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(store.metaList())
+	})
+
+	// The live head id — bumps only on a real content change (dedup).
+	mux.HandleFunc("/__mtime", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(w, "%d", store.headID())
 	})
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -65,7 +101,7 @@ func Serve(ctx context.Context, c *Converter, in string, interval time.Duration,
 
 	server := &http.Server{Handler: mux}
 
-	// Poll for file changes and re-render.
+	// Poll for file changes and append a version on each real change.
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -79,7 +115,7 @@ func Serve(ctx context.Context, c *Converter, in string, interval time.Duration,
 					continue
 				}
 				mod, size = m, s
-				h.set(renderPage(c, in))
+				store.add(renderContent(c, in), "edit")
 			}
 		}
 	}()
@@ -98,48 +134,100 @@ func Serve(ctx context.Context, c *Converter, in string, interval time.Duration,
 	return nil
 }
 
-// renderPage returns the bytes to serve for in: the rendered document with the
-// reload script injected before </body>, or a minimal error page (also with
-// the reload script, so a fixed file reloads out of the error state).
-func renderPage(c *Converter, in string) []byte {
-	var s string
-	if out, err := c.Render(in); err != nil {
-		s = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>mkdown error</title></head><body><pre>" +
-			html.EscapeString(err.Error()) + "</pre></body></html>"
-	} else {
-		s = string(out)
+// renderContent returns the pristine rendered document for in — Converter.Render
+// output, or a minimal standalone error page on failure. No reload script is
+// injected: the shell handles reloading (it reloads the iframe). The bytes here
+// equal what `mkdown in` would write to disk.
+func renderContent(c *Converter, in string) []byte {
+	out, err := c.Render(in)
+	if err != nil {
+		return []byte("<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>mkdown error</title></head><body><pre>" +
+			html.EscapeString(err.Error()) + "</pre></body></html>")
 	}
-	if i := strings.LastIndex(s, "</body>"); i != -1 {
-		return []byte(s[:i] + reloadScript + s[i:])
+	return out
+}
+
+// version is one snapshot of the document during the serve session.
+type version struct {
+	id   int
+	kind string // "opened" | "edit"
+	ts   time.Time
+	html []byte
+}
+
+// versionMeta is the JSON shape sent to the sidebar (no html).
+type versionMeta struct {
+	ID    int    `json:"id"`
+	Kind  string `json:"kind"`
+	Label string `json:"label"`
+}
+
+// versionStore is the concurrency-safe ordered list of session versions, read
+// by the HTTP handlers and written by the poll goroutine.
+type versionStore struct {
+	mu       sync.RWMutex
+	versions []*version
+	nextID   int
+}
+
+func newVersionStore() *versionStore {
+	return &versionStore{nextID: 1}
+}
+
+// add appends a new version with the given rendered html and kind, unless html
+// is identical to the current head (dedup — a save that didn't change the
+// output adds nothing). Returns true if a version was appended.
+func (s *versionStore) add(htmlBytes []byte, kind string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if n := len(s.versions); n > 0 && bytes.Equal(s.versions[n-1].html, htmlBytes) {
+		return false
 	}
-	return []byte(s + reloadScript)
+	s.versions = append(s.versions, &version{id: s.nextID, kind: kind, ts: time.Now(), html: htmlBytes})
+	s.nextID++
+	return true
 }
 
-// serveHolder is the concurrency-safe current page + version, read by the HTTP
-// handlers and written by the poll goroutine.
-type serveHolder struct {
-	mu      sync.RWMutex
-	html    []byte
-	version int
+// head returns the current (newest) version's html.
+func (s *versionStore) head() []byte {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.versions) == 0 {
+		return nil
+	}
+	return s.versions[len(s.versions)-1].html
 }
 
-// set replaces the served page and bumps the version. The slice is never
-// mutated in place, so readers holding the old slice are unaffected.
-func (h *serveHolder) set(b []byte) {
-	h.mu.Lock()
-	h.html = b
-	h.version++
-	h.mu.Unlock()
+// headID returns the current (newest) version's id, or 0 if empty.
+func (s *versionStore) headID() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.versions) == 0 {
+		return 0
+	}
+	return s.versions[len(s.versions)-1].id
 }
 
-func (h *serveHolder) getHTML() []byte {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return h.html
+// get returns the html for the version with the given id.
+func (s *versionStore) get(id int) ([]byte, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, v := range s.versions {
+		if v.id == id {
+			return v.html, true
+		}
+	}
+	return nil, false
 }
 
-func (h *serveHolder) getVersion() int {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return h.version
+// metaList returns version metadata newest-first for the sidebar.
+func (s *versionStore) metaList() []versionMeta {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]versionMeta, 0, len(s.versions))
+	for i := len(s.versions) - 1; i >= 0; i-- {
+		v := s.versions[i]
+		out = append(out, versionMeta{ID: v.id, Kind: v.kind, Label: v.ts.Format("15:04:05")})
+	}
+	return out
 }

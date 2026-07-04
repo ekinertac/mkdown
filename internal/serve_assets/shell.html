@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mkdown serve</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      display: flex;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    #content { flex: 1 1 auto; height: 100vh; width: 100%; border: 0; }
+    #history {
+      flex: 0 0 320px;
+      height: 100vh;
+      overflow-y: auto;
+      border-left: 1px solid #30363d;
+      background: #0d1117;
+      color: #e6edf3;
+      padding: 14px 12px;
+      font-size: 13px;
+    }
+    #history h2 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #8b949e;
+      margin: 0 0 10px;
+      font-weight: 600;
+    }
+    .ver {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .ver:hover { background: #161b22; }
+    .ver.selected { background: rgba(31, 111, 235, 0.2); }
+    .ver .dot { color: #6e7681; font-size: 10px; line-height: 1.4; }
+    .ver.selected .dot { color: #1f6feb; }
+    .ver .kind { color: #8b949e; min-width: 42px; }
+    .ver .label { color: #e6edf3; font-variant-numeric: tabular-nums; }
+    #live-btn {
+      display: none;
+      width: 100%;
+      margin-top: 12px;
+      padding: 7px;
+      background: #1f6feb;
+      color: #fff;
+      border: 0;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    #live-btn:hover { background: #388bfd; }
+  </style>
+</head>
+<body>
+  <iframe id="content" src="/__content" title="preview"></iframe>
+  <aside id="history">
+    <h2>History</h2>
+    <div id="versions"></div>
+    <button id="live-btn">&larr; Back to Live</button>
+  </aside>
+  <script>
+    (function () {
+      var iframe = document.getElementById("content");
+      var list = document.getElementById("versions");
+      var liveBtn = document.getElementById("live-btn");
+      var following = true;   // tracking the live head?
+      var selectedID = null;  // which version the iframe shows (snapshot mode)
+      var lastMtime = null;
+
+      function goLive() {
+        following = true;
+        selectedID = null;
+        liveBtn.style.display = "none";
+        iframe.src = "/__content";
+        refresh();
+      }
+      function showVersion(id) {
+        following = false;
+        selectedID = id;
+        liveBtn.style.display = "block";
+        iframe.src = "/__version/" + id;
+        refresh();
+      }
+      liveBtn.onclick = goLive;
+
+      function refresh() {
+        fetch("/__versions").then(function (r) { return r.json(); }).then(function (vs) {
+          list.innerHTML = "";
+          vs.forEach(function (v, i) {
+            var isTop = i === 0; // newest = the live head
+            var selected = following ? isTop : v.id === selectedID;
+            var row = document.createElement("div");
+            row.className = "ver" + (selected ? " selected" : "");
+            var kind = isTop ? "Live" : v.kind;
+            var dot = document.createElement("span"); dot.className = "dot"; dot.textContent = "●";
+            var k = document.createElement("span"); k.className = "kind"; k.textContent = kind;
+            var lbl = document.createElement("span"); lbl.className = "label"; lbl.textContent = v.label;
+            row.appendChild(dot); row.appendChild(k); row.appendChild(lbl);
+            row.onclick = function () { if (isTop) { goLive(); } else { showVersion(v.id); } };
+            list.appendChild(row);
+          });
+        }).catch(function () {});
+      }
+
+      function poll() {
+        fetch("/__mtime").then(function (r) { return r.text(); }).then(function (t) {
+          if (lastMtime !== null && t !== lastMtime) {
+            if (following) { iframe.src = "/__content?v=" + t; } // force reload of the head
+            refresh();
+          }
+          lastMtime = t;
+        }).catch(function () {});
+      }
+
+      refresh();
+      poll();
+      setInterval(poll, 300);
+    })();
+  </script>
+</body>
+</html>
