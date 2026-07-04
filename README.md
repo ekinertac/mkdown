@@ -95,6 +95,10 @@ This starts a local server (a free port on `127.0.0.1`), opens your browser, and
 re-renders on each save — the tab reloads itself. Ctrl+C stops it. The render
 flags (`--theme`, `--mermaid`, `--math`, `--no-highlight`) apply.
 
+A **version-history** sidebar on the right records every save in the session.
+Click any earlier entry to view that snapshot in place, or **Back to Live** to
+resume following your edits.
+
 ### CLI Flags
 
 ```
