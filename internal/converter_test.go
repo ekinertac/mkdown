@@ -417,3 +417,33 @@ func TestTableExtension(t *testing.T) {
 	}
 }
 
+func TestRender(t *testing.T) {
+	dir := t.TempDir()
+	in := filepath.Join(dir, "doc.md")
+	if err := os.WriteFile(in, []byte("# Hello\n\nWorld."), 0644); err != nil {
+		t.Fatal(err)
+	}
+	c := NewConverter("dark")
+	out, err := c.Render(in)
+	if err != nil {
+		t.Fatalf("Render returned error: %v", err)
+	}
+	s := string(out)
+	if !strings.Contains(s, "<!DOCTYPE html>") {
+		t.Errorf("Render output is not a full document: %s", s[:min(200, len(s))])
+	}
+	if !strings.Contains(s, "Hello") || !strings.Contains(s, "World") {
+		t.Errorf("Render output missing content: %s", s)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "doc.html")); !os.IsNotExist(err) {
+		t.Error("Render should not write an output file")
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+

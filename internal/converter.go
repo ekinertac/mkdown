@@ -115,19 +115,22 @@ func NewConverterWithOptions(opts ConverterOptions) *Converter {
 	}
 }
 
-func (c *Converter) Convert(inputPath, outputPath string) error {
+// buildDocument reads the input markdown file and returns the fully populated
+// template Document (frontmatter parsed, math protected/restored, scripts
+// injected). Shared by Convert (streams to file) and Render (returns bytes).
+func (c *Converter) buildDocument(inputPath string) (*Document, error) {
 	// Read input file
 	source, err := os.ReadFile(inputPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Parse frontmatter
 	doc, markdownContent := c.parseFrontmatter(source)
 
 	// Protect math blocks if math is enabled. The placeholder map is kept
-	// local to this call so Convert is reentrant and safe to run from many
-	// goroutines concurrently (batch mode).
+	// local to this call so buildDocument is reentrant and safe to run from
+	// many goroutines concurrently (batch mode).
 	var mathBlocks map[int]string
 	if c.enableMath {
 		markdownContent, mathBlocks = c.protectMathBlocks(markdownContent)
@@ -143,7 +146,7 @@ func (c *Converter) Convert(inputPath, outputPath string) error {
 	pc := parser.NewContext(parser.WithIDs(newFastIDs()))
 	if err := c.markdown.Convert(markdownContent, buf, parser.WithContext(pc)); err != nil {
 		bufPool.Put(buf)
-		return err
+		return nil, err
 	}
 
 	// String() copies, so the buffer can go back to the pool immediately.
@@ -159,6 +162,30 @@ func (c *Converter) Convert(inputPath, outputPath string) error {
 
 	// Inject scripts if needed
 	c.injectScripts(doc, markdownContent)
+	return doc, nil
+}
+
+// Render reads the input markdown file and returns the full standalone HTML
+// document as bytes, without writing anything to disk. Used by the serve
+// feature, which needs the rendered document in memory to hand back over
+// HTTP rather than as a file on disk.
+func (c *Converter) Render(inputPath string) ([]byte, error) {
+	doc, err := c.buildDocument(inputPath)
+	if err != nil {
+		return nil, err
+	}
+	var out bytes.Buffer
+	if err := c.template.Execute(&out, doc); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
+}
+
+func (c *Converter) Convert(inputPath, outputPath string) error {
+	doc, err := c.buildDocument(inputPath)
+	if err != nil {
+		return err
+	}
 
 	// Create output directory if it doesn't exist
 	outputDir := filepath.Dir(outputPath)
