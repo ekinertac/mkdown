@@ -33,6 +33,11 @@ const reloadScript = `<script>
 // the browser, tests use it to learn the assigned port. Change detection polls
 // modtime+size every interval, the same mechanism as Watch.
 func Serve(ctx context.Context, c *Converter, in string, interval time.Duration, ready func(url string)) error {
+	// Snapshot the file signature before the initial render so a save racing
+	// that render is still caught on the next tick (at worst one redundant
+	// render, never a missed one). Mirrors the same fix in Watch.
+	mod, size := statSig(in)
+
 	h := &serveHolder{}
 	h.set(renderPage(c, in)) // initial render (or error page); version -> 1
 
@@ -62,7 +67,6 @@ func Serve(ctx context.Context, c *Converter, in string, interval time.Duration,
 
 	// Poll for file changes and re-render.
 	go func() {
-		mod, size := statSig(in)
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
