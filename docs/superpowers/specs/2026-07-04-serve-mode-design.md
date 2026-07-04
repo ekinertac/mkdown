@@ -160,3 +160,16 @@ takes the write lock). Verified race-free under `go test -race`.
 - SSE / WebSocket reload transport (polling chosen).
 - HTTPS, LAN exposure, auth.
 - Serving referenced local assets (images/CSS) beyond the self-contained HTML.
+
+## Future enhancement (deferred — its own spec later)
+
+**Highlight-on-change.** On reload, flash the parts of the page that changed and
+clear the highlight on click. This is *not* a small add-on to v1: `/__mtime` is
+a version counter, not a content diff, and v1 reloads with `location.reload()`
+(a full page swap that would destroy any highlight and reset scroll). Doing it
+right means computing an actual diff and replacing the reload transport with a
+fetch-and-morph client (fetch new HTML, diff against the current DOM, patch only
+changed nodes, flash them, clear on click) — effectively a second feature.
+v1's poll+reload architecture does not block it: when built, it swaps the
+injected `location.reload()` for the fetch-and-morph path. Deferred to its own
+brainstorm → spec → plan.
