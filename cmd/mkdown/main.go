@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
@@ -39,6 +40,13 @@ func main() {
 	// Live memory stays bounded by the number of concurrent workers (not the
 	// batch size), so this is safe even for very large batches.
 	debug.SetGCPercent(400)
+
+	// serve is a subcommand: `mkdown serve <file> [flags]`. Handle it before the
+	// flag parser, which is built around a single positional input file.
+	if len(os.Args) > 1 && os.Args[1] == "serve" {
+		runServe(os.Args[2:])
+		return
+	}
 
 	// Parse flags manually to allow flags after positional args
 	var (
@@ -96,6 +104,8 @@ func main() {
 			fmt.Println("  --watch              Re-render the file on every change (single file; Ctrl+C to stop)")
 			fmt.Println("  -v, --version        Show version")
 			fmt.Println("  -h, --help          Show this help")
+			fmt.Println("\nSubcommands:")
+			fmt.Println("  serve <input.md>     Live preview in the browser, auto-refresh on save (Ctrl+C to stop)")
 			fmt.Println("\nExamples:")
 			fmt.Println("  mkdown README.md")
 			fmt.Println("  mkdown input.md -o output.html")
@@ -104,6 +114,7 @@ func main() {
 			fmt.Println("  mkdown diagram.md --mermaid")
 			fmt.Println("  mkdown math.md --math")
 			fmt.Println("  mkdown --watch README.md     # re-render on save until Ctrl+C")
+			fmt.Println("  mkdown serve README.md       # live preview in the browser")
 			os.Exit(0)
 		default:
 			if !strings.HasPrefix(arg, "-") {
@@ -231,6 +242,97 @@ func runBatch(converter *internal.Converter, inputPaths []string, theme string, 
 		ok, len(inputPaths), elapsed.Round(time.Millisecond), theme, featureSuffix(mermaid, math), workers)
 	if failed > 0 {
 		os.Exit(1)
+	}
+}
+
+// runServe parses `mkdown serve <file> [flags]` and runs the live-preview
+// server until interrupted. It parses its own args (a single markdown file plus
+// the render flags) rather than reusing the main flag loop, which is built for
+// batch/convert output paths that don't apply here.
+func runServe(args []string) {
+	var (
+		inputPath     string
+		theme         = "dark"
+		enableMermaid bool
+		enableMath    bool
+		noHighlight   bool
+	)
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "-t", "--theme":
+			if i+1 < len(args) {
+				theme = args[i+1]
+				if theme != "dark" && theme != "light" {
+					fmt.Fprintf(os.Stderr, "Error: Invalid theme '%s'. Available: dark, light\n", theme)
+					os.Exit(1)
+				}
+				i++
+			} else {
+				fmt.Fprintln(os.Stderr, "Error: -t requires an argument")
+				os.Exit(1)
+			}
+		case "--mermaid":
+			enableMermaid = true
+		case "--math":
+			enableMath = true
+		case "--no-highlight":
+			noHighlight = true
+		default:
+			if !strings.HasPrefix(arg, "-") && inputPath == "" {
+				inputPath = arg
+			} else {
+				fmt.Fprintf(os.Stderr, "Error: Unknown argument: %s\n", arg)
+				os.Exit(1)
+			}
+		}
+	}
+
+	if inputPath == "" {
+		fmt.Fprintln(os.Stderr, "Usage: mkdown serve <input.md> [--theme|--mermaid|--math|--no-highlight]")
+		os.Exit(1)
+	}
+	if _, err := os.Stat(inputPath); os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "Error: File '%s' not found\n", inputPath)
+		os.Exit(1)
+	}
+	lower := strings.ToLower(inputPath)
+	if !strings.HasSuffix(lower, ".md") && !strings.HasSuffix(lower, ".markdown") {
+		fmt.Fprintf(os.Stderr, "Error: Input file must be a markdown file (.md or .markdown): %s\n", inputPath)
+		os.Exit(1)
+	}
+
+	converter := internal.NewConverterWithOptions(internal.ConverterOptions{
+		Theme:            theme,
+		EnableMermaid:    enableMermaid,
+		EnableMath:       enableMath,
+		DisableHighlight: noHighlight,
+	})
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	ready := func(url string) {
+		fmt.Printf("serving %s (Ctrl+C to stop)\n", url)
+		_ = openBrowser(url) // best effort; URL already printed
+	}
+
+	if err := internal.Serve(ctx, converter, inputPath, 250*time.Millisecond, ready); err != nil {
+		stop()
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// openBrowser opens url in the default browser, best-effort, cross-platform.
+func openBrowser(url string) error {
+	switch runtime.GOOS {
+	case "darwin":
+		return exec.Command("open", url).Start()
+	case "windows":
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	default:
+		return exec.Command("xdg-open", url).Start()
 	}
 }
 
