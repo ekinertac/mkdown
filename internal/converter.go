@@ -116,15 +116,20 @@ func NewConverterWithOptions(opts ConverterOptions) *Converter {
 }
 
 // buildDocument reads the input markdown file and returns the fully populated
-// template Document (frontmatter parsed, math protected/restored, scripts
-// injected). Shared by Convert (streams to file) and Render (returns bytes).
+// template Document. Thin wrapper over buildDocumentFromSource.
 func (c *Converter) buildDocument(inputPath string) (*Document, error) {
-	// Read input file
 	source, err := os.ReadFile(inputPath)
 	if err != nil {
 		return nil, err
 	}
+	return c.buildDocumentFromSource(source)
+}
 
+// buildDocumentFromSource turns raw markdown bytes into a fully populated
+// template Document (frontmatter parsed, math protected/restored, scripts
+// injected). Shared by buildDocument (file path) and RenderBytes (in-memory
+// content, e.g. a git blob). Reentrant — no shared mutable state.
+func (c *Converter) buildDocumentFromSource(source []byte) (*Document, error) {
 	// Parse frontmatter
 	doc, markdownContent := c.parseFrontmatter(source)
 
@@ -174,6 +179,22 @@ func (c *Converter) Render(inputPath string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	return c.executeToBytes(doc)
+}
+
+// RenderBytes renders markdown source bytes to a full standalone HTML document,
+// without reading or writing any file. Used by the serve version history to
+// render a file's historical content fetched from git (a blob, not a path).
+func (c *Converter) RenderBytes(source []byte) ([]byte, error) {
+	doc, err := c.buildDocumentFromSource(source)
+	if err != nil {
+		return nil, err
+	}
+	return c.executeToBytes(doc)
+}
+
+// executeToBytes runs the template for doc into a fresh buffer.
+func (c *Converter) executeToBytes(doc *Document) ([]byte, error) {
 	var out bytes.Buffer
 	if err := c.template.Execute(&out, doc); err != nil {
 		return nil, err

@@ -440,3 +440,18 @@ func TestRender(t *testing.T) {
 	}
 }
 
+func TestRenderBytes(t *testing.T) {
+	c := NewConverter("dark")
+	out, err := c.RenderBytes([]byte("# Title\n\nBody text."))
+	if err != nil {
+		t.Fatalf("RenderBytes returned error: %v", err)
+	}
+	s := string(out)
+	if !strings.Contains(s, "<!DOCTYPE html>") {
+		t.Errorf("RenderBytes output is not a full document: %s", s[:min(200, len(s))])
+	}
+	if !strings.Contains(s, "Title") || !strings.Contains(s, "Body text") {
+		t.Errorf("RenderBytes output missing content: %s", s)
+	}
+}
+
