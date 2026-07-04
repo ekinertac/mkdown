@@ -113,8 +113,11 @@
 
       function poll() {
         fetch("/__mtime").then(function (r) { return r.text(); }).then(function (t) {
-          if (lastMtime !== null && t !== lastMtime) {
-            if (following) { iframe.src = "/__content?v=" + t; } // force reload of the head
+          // On the very first poll (lastMtime === null) this forces one reload
+          // to the current head, so the iframe can't be left showing a stale
+          // snapshot if a change landed between its static load and this poll.
+          if (t !== lastMtime) {
+            if (following) { iframe.src = "/__content?v=" + t; } // reload the head
             refresh();
           }
           lastMtime = t;

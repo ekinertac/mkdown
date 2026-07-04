@@ -140,6 +140,9 @@ func TestServeVersionHistory(t *testing.T) {
 	if s := httpStatus(t, base+"/__version/999"); s != http.StatusNotFound {
 		t.Fatalf("/__version/999 status = %d, want 404", s)
 	}
+	if s := httpStatus(t, base+"/__version/abc"); s != http.StatusNotFound {
+		t.Fatalf("/__version/abc (non-numeric) status = %d, want 404", s)
+	}
 	if s := httpStatus(t, base+"/nope"); s != http.StatusNotFound {
 		t.Fatalf("/nope status = %d, want 404", s)
 	}
@@ -151,6 +154,20 @@ func TestServeVersionHistory(t *testing.T) {
 	}
 	if !strings.Contains(versions, `"kind":"opened"`) || !strings.Contains(versions, `"kind":"edit"`) {
 		t.Fatalf("/__versions missing kinds: %s", versions)
+	}
+
+	// A save that doesn't change the rendered output must NOT add a version
+	// (dedup), so /__mtime must not bump. Rewrite the same content, let many
+	// poll ticks pass, and confirm the head id is unchanged.
+	if err := os.WriteFile(in, []byte("# Second"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(120 * time.Millisecond) // ~12 poll ticks at the 10ms interval
+	if v := httpGetBody(t, base+"/__mtime"); v != "2" {
+		t.Fatalf("/__mtime after a no-op save = %q, want unchanged 2", v)
+	}
+	if v := httpGetBody(t, base+"/__versions"); strings.Contains(v, `"id":3`) {
+		t.Fatalf("a no-op save added a version: %s", v)
 	}
 
 	cancel()
