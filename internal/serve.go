@@ -47,7 +47,15 @@ func Serve(ctx context.Context, c *Converter, in string, interval time.Duration,
 	commits, rel := gitHistory(in)
 	for _, ci := range commits { // newest-first; addGit keeps that order
 		ci := ci
-		store.addGit(ci.short, ci.subject, ci.date, func() []byte {
+		store.addGit(ci.short, ci.subject, ci.date, func() (result []byte) {
+			// A panic here would otherwise be swallowed by sync.Once, leaving
+			// this version permanently serving empty content. Convert it to an
+			// error page so a bad blob shows the error, like a render error.
+			defer func() {
+				if r := recover(); r != nil {
+					result = errorPage(fmt.Errorf("render panicked: %v", r))
+				}
+			}()
 			src, err := gitShow(dir, ci.sha, rel)
 			if err != nil {
 				return errorPage(err)
