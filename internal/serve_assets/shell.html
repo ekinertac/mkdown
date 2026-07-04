@@ -27,9 +27,10 @@
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: #8b949e;
-      margin: 0 0 10px;
+      margin: 14px 0 6px;
       font-weight: 600;
     }
+    #history h2:first-child { margin-top: 0; }
     .ver {
       display: flex;
       align-items: baseline;
@@ -41,90 +42,159 @@
     }
     .ver:hover { background: #161b22; }
     .ver.selected { background: rgba(31, 111, 235, 0.2); }
-    .ver .dot { color: #6e7681; font-size: 10px; line-height: 1.4; }
+    .ver .dot { color: #6e7681; font-size: 10px; line-height: 1.4; flex: 0 0 auto; }
     .ver.selected .dot { color: #1f6feb; }
-    .ver .kind { color: #8b949e; min-width: 42px; }
+    .ver .kind { color: #8b949e; min-width: 42px; flex: 0 0 auto; }
     .ver .label { color: #e6edf3; font-variant-numeric: tabular-nums; }
-    #live-btn {
+    .ver .sha {
+      color: #8b949e; flex: 0 0 auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+    }
+    .ver .subject {
+      color: #e6edf3; flex: 1 1 auto;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .ver .date { color: #6e7681; flex: 0 0 auto; font-size: 11px; }
+    #load-more, #live-btn {
       display: none;
       width: 100%;
-      margin-top: 12px;
+      margin-top: 8px;
       padding: 7px;
-      background: #1f6feb;
-      color: #fff;
       border: 0;
       border-radius: 6px;
       cursor: pointer;
       font-size: 13px;
     }
+    #load-more { background: #21262d; color: #c9d1d9; }
+    #load-more:hover { background: #30363d; }
+    #live-btn { background: #1f6feb; color: #fff; margin-top: 12px; }
     #live-btn:hover { background: #388bfd; }
   </style>
 </head>
 <body>
   <iframe id="content" src="/__content" title="preview"></iframe>
   <aside id="history">
-    <h2>History</h2>
-    <div id="versions"></div>
+    <h2>Live</h2>
+    <div id="live-versions"></div>
+    <h2 id="git-heading" style="display:none">Git history</h2>
+    <div id="git-versions"></div>
+    <button id="load-more">Load 25 more</button>
     <button id="live-btn">&larr; Back to Live</button>
   </aside>
   <script>
     (function () {
       var iframe = document.getElementById("content");
-      var list = document.getElementById("versions");
+      var liveList = document.getElementById("live-versions");
+      var gitList = document.getElementById("git-versions");
+      var gitHeading = document.getElementById("git-heading");
+      var loadMore = document.getElementById("load-more");
       var liveBtn = document.getElementById("live-btn");
       var following = true;   // tracking the live head?
       var selectedID = null;  // which version the iframe shows (snapshot mode)
       var lastMtime = null;
+      var gitOffset = 0;
+
+      function relativeDate(iso) {
+        var then = new Date(iso).getTime();
+        if (isNaN(then)) { return ""; }
+        var secs = Math.max(0, (Date.now() - then) / 1000);
+        if (secs < 60) { return "just now"; }
+        var mins = Math.floor(secs / 60); if (mins < 60) { return mins + "m ago"; }
+        var hrs = Math.floor(mins / 60);  if (hrs < 24) { return hrs + "h ago"; }
+        var days = Math.floor(hrs / 24);  if (days < 30) { return days + "d ago"; }
+        return new Date(iso).toISOString().slice(0, 10);
+      }
+
+      function makeRow(id, cells) {
+        var row = document.createElement("div");
+        row.className = "ver";
+        row.dataset.id = id;
+        cells.forEach(function (c) {
+          var span = document.createElement("span");
+          span.className = c.cls;
+          span.textContent = c.text;
+          row.appendChild(span);
+        });
+        return row;
+      }
+
+      function updateSelection() {
+        var rows = document.querySelectorAll(".ver");
+        rows.forEach(function (row) {
+          var id = parseInt(row.dataset.id, 10);
+          var sel = following ? row.dataset.top === "1" : id === selectedID;
+          row.classList.toggle("selected", sel);
+        });
+      }
 
       function goLive() {
         following = true;
         selectedID = null;
         liveBtn.style.display = "none";
         iframe.src = "/__content";
-        refresh();
+        updateSelection();
       }
       function showVersion(id) {
         following = false;
         selectedID = id;
         liveBtn.style.display = "block";
         iframe.src = "/__version/" + id;
-        refresh();
+        updateSelection();
       }
       liveBtn.onclick = goLive;
 
-      function refresh() {
+      function refreshLive() {
         fetch("/__versions").then(function (r) { return r.json(); }).then(function (vs) {
-          list.innerHTML = "";
+          liveList.innerHTML = "";
           vs.forEach(function (v, i) {
-            var isTop = i === 0; // newest = the live head
-            var selected = following ? isTop : v.id === selectedID;
-            var row = document.createElement("div");
-            row.className = "ver" + (selected ? " selected" : "");
-            var kind = isTop ? "Live" : v.kind;
-            var dot = document.createElement("span"); dot.className = "dot"; dot.textContent = "●";
-            var k = document.createElement("span"); k.className = "kind"; k.textContent = kind;
-            var lbl = document.createElement("span"); lbl.className = "label"; lbl.textContent = v.label;
-            row.appendChild(dot); row.appendChild(k); row.appendChild(lbl);
-            row.onclick = function () { if (isTop) { goLive(); } else { showVersion(v.id); } };
-            list.appendChild(row);
+            var isTop = i === 0;
+            var row = makeRow(v.id, [
+              { cls: "dot", text: "●" },
+              { cls: "kind", text: isTop ? "Live" : v.kind },
+              { cls: "label", text: v.label }
+            ]);
+            if (isTop) { row.dataset.top = "1"; }
+            row.onclick = isTop ? goLive : (function (id) { return function () { showVersion(id); }; })(v.id);
+            liveList.appendChild(row);
           });
+          updateSelection();
         }).catch(function () {});
       }
 
+      function loadGit() {
+        fetch("/__git?offset=" + gitOffset).then(function (r) { return r.json(); }).then(function (res) {
+          (res.items || []).forEach(function (v) {
+            var row = makeRow(v.id, [
+              { cls: "dot", text: "●" },
+              { cls: "sha", text: v.sha },
+              { cls: "subject", text: v.subject },
+              { cls: "date", text: relativeDate(v.date) }
+            ]);
+            row.onclick = (function (id) { return function () { showVersion(id); }; })(v.id);
+            gitList.appendChild(row);
+            gitOffset++;
+          });
+          if (gitList.children.length) { gitHeading.style.display = "block"; }
+          loadMore.style.display = res.more ? "block" : "none";
+          updateSelection();
+        }).catch(function () {});
+      }
+      loadMore.onclick = loadGit;
+
       function poll() {
         fetch("/__mtime").then(function (r) { return r.text(); }).then(function (t) {
-          // On the very first poll (lastMtime === null) this forces one reload
-          // to the current head, so the iframe can't be left showing a stale
-          // snapshot if a change landed between its static load and this poll.
+          // First poll (lastMtime === null) forces one reload so the iframe
+          // can't be left showing a stale snapshot labelled Live.
           if (t !== lastMtime) {
-            if (following) { iframe.src = "/__content?v=" + t; } // reload the head
-            refresh();
+            if (following) { iframe.src = "/__content?v=" + t; }
+            refreshLive();
           }
           lastMtime = t;
         }).catch(function () {});
       }
 
-      refresh();
+      refreshLive();
+      loadGit();
       poll();
       setInterval(poll, 300);
     })();
