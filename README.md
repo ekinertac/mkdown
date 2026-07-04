@@ -85,6 +85,16 @@ runs as one process across a worker pool, batch conversion avoids the per-file
 startup cost a shell loop (`for f in *.md; ...`) would pay. `-o` is only valid
 with a single input.
 
+### Live Preview
+
+Serve a file and edit it with your browser auto-refreshing on every save:
+
+    mkdown serve readme.md
+
+This starts a local server (a free port on `127.0.0.1`), opens your browser, and
+re-renders on each save — the tab reloads itself. Ctrl+C stops it. The render
+flags (`--theme`, `--mermaid`, `--math`, `--no-highlight`) apply.
+
 ### CLI Flags
 
 ```

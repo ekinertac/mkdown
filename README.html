@@ -556,6 +556,13 @@ single process, sized to the available CPU budget:</p>
 runs as one process across a worker pool, batch conversion avoids the per-file
 startup cost a shell loop (<code>for f in *.md; ...</code>) would pay. <code>-o</code> is only valid
 with a single input.</p>
+<h3 id="live-preview">Live Preview</h3>
+<p>Serve a file and edit it with your browser auto-refreshing on every save:</p>
+<pre><code>mkdown serve readme.md
+</code></pre>
+<p>This starts a local server (a free port on <code>127.0.0.1</code>), opens your browser, and
+re-renders on each save — the tab reloads itself. Ctrl+C stops it. The render
+flags (<code>--theme</code>, <code>--mermaid</code>, <code>--math</code>, <code>--no-highlight</code>) apply.</p>
 <h3 id="cli-flags">CLI Flags</h3>
 <pre><code>mkdown &lt;input.md&gt;... [flags]
 
