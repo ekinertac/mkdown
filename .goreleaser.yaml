@@ -71,9 +71,16 @@ homebrew_casks:
     #   brew install ekinertac/tap/mkdown
     # The binaries are not notarized, so strip the Gatekeeper quarantine flag
     # on install to avoid "cannot be opened" errors on macOS.
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/mkdown"]
-          end
+    #
+    # Written as custom_block instead of hooks.post.install because goreleaser
+    # still emits the legacy `postflight do` form, which Homebrew 7 deprecates
+    # in favour of postflight_steps. The {{ "{{staged_path}}" }} escape is needed
+    # because goreleaser runs this block through Go templates; the cask receives
+    # the literal {{staged_path}}, which Homebrew expands at install time.
+    # Needs a Homebrew new enough to know postflight_steps.
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{staged_path}}" }}/mkdown"]
+        end
+      end
